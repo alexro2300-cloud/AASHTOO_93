@@ -1,6 +1,16 @@
 import math
 
 
+
+DEFAULT_MINIMUMS_TABLE_IN = {
+    "lt_50000": {"label": "< 50,000", "D1_min_in": 1.0, "D2_min_in": 4.0},
+    "50k_150k": {"label": "50,001 - 150,000", "D1_min_in": 2.0, "D2_min_in": 4.0},
+    "150k_500k": {"label": "150,001 - 500,000", "D1_min_in": 2.5, "D2_min_in": 4.0},
+    "500k_2m": {"label": "500,001 - 2,000,000", "D1_min_in": 3.0, "D2_min_in": 6.0},
+    "2m_7m": {"label": "2,000,001 - 7,000,000", "D1_min_in": 3.5, "D2_min_in": 6.0},
+    "gt_7m": {"label": "> 7,000,000", "D1_min_in": 4.0, "D2_min_in": 6.0},
+}
+
 def _cm_to_in(cm: float) -> float:
     return cm / 2.54
 
@@ -23,29 +33,31 @@ def round_half_up(value_in: float) -> float:
     return math.ceil(value_in * 2.0 - 1e-12) / 2.0
 
 
-def minimum_thicknesses_by_w18(w18: float) -> dict:
-    """Tabla 7-2 de mínimos sugeridos (AASHTO 1993), en cm e in."""
+def minimum_thicknesses_by_w18(w18: float, table_in: dict | None = None) -> dict:
+    """Tabla de mínimos en pulgadas configurable por rangos de W18."""
+    table = table_in or DEFAULT_MINIMUMS_TABLE_IN
     if w18 < 50_000:
-        asphalt_cm, base_cm, label = 3.0, 10.0, "< 50,000"
-    elif w18 < 150_000:
-        asphalt_cm, base_cm, label = 5.0, 10.0, "50,000 - 150,000"
-    elif w18 < 500_000:
-        asphalt_cm, base_cm, label = 6.5, 10.0, "150,000 - 500,000"
-    elif w18 < 2_000_000:
-        asphalt_cm, base_cm, label = 7.5, 15.0, "500,000 - 2,000,000"
+        row = table["lt_50000"]
+    elif w18 <= 150_000:
+        row = table["50k_150k"]
+    elif w18 <= 500_000:
+        row = table["150k_500k"]
+    elif w18 <= 2_000_000:
+        row = table["500k_2m"]
     elif w18 <= 7_000_000:
-        asphalt_cm, base_cm, label = 9.0, 15.0, "2,000,000 - 7,000,000"
+        row = table["2m_7m"]
     else:
-        asphalt_cm, base_cm, label = 10.0, 15.0, "> 7,000,000"
+        row = table["gt_7m"]
 
+    d1_in = float(row["D1_min_in"])
+    d2_in = float(row["D2_min_in"])
     return {
-        "range_label": label,
-        "D1_min_cm": asphalt_cm,
-        "D2_min_cm": base_cm,
-        "D1_min_in": _cm_to_in(asphalt_cm),
-        "D2_min_in": _cm_to_in(base_cm),
+        "range_label": row.get("label", "Rango"),
+        "D1_min_in": d1_in,
+        "D2_min_in": d2_in,
+        "D1_min_cm": _in_to_cm(d1_in),
+        "D2_min_cm": _in_to_cm(d2_in),
     }
-
 
 def design_thicknesses_sequential(sn1_target, sn2_target, sn3_target, a1, a2, a3, m2, m3):
     """
@@ -96,11 +108,11 @@ def design_thicknesses_sequential(sn1_target, sn2_target, sn3_target, a1, a2, a3
     }
 
 
-def apply_minimums_sequential(calc_result: dict, w18: float, a1, a2, a3, m2, m3, sn3_target: float):
+def apply_minimums_sequential(calc_result: dict, w18: float, a1, a2, a3, m2, m3, sn3_target: float, minimums_table_in: dict | None = None):
     """
     Ajusta carpeta/base por mínimos Tabla 7-2 y recalcula subbase.
     """
-    mins = minimum_thicknesses_by_w18(w18)
+    mins = minimum_thicknesses_by_w18(w18, table_in=minimums_table_in)
 
     d1_min_round = round_half_up(mins["D1_min_in"])
     d2_min_round = round_half_up(mins["D2_min_in"])

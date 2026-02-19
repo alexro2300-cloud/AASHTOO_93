@@ -3,7 +3,7 @@ from tkinter import ttk, filedialog, messagebox
 
 from core.esals import calc_w18, calc_truck_factor_detailed
 from core.aashto93_flexible import solve_sn_required
-from core.layers import design_thicknesses_sequential, apply_minimums_sequential
+from core.layers import design_thicknesses_sequential, apply_minimums_sequential, DEFAULT_MINIMUMS_TABLE_IN
 from data_io.project_json import save_project, load_project
 
 
@@ -92,6 +92,7 @@ class App:
                 "mr_min": 20.0, "mr_max": 300.0,
                 "r_min": 50.0, "r_max": 99.9,
             },
+            "minimums_table": {k: v.copy() for k, v in DEFAULT_MINIMUMS_TABLE_IN.items()},
             "results": {},
         }
 
@@ -284,31 +285,72 @@ class App:
 
     def on_options(self):
         win = tk.Toplevel(self.root)
-        win.title("Opciones de validación")
-        win.geometry("780x520")
-        frame = ttk.Frame(win, padding=12)
-        frame.pack(fill="both", expand=True)
-        ttk.Label(frame, text="Parámetro", font=("Segoe UI", 10, "bold")).grid(row=0, column=0, sticky="w")
-        ttk.Label(frame, text="Descripción", font=("Segoe UI", 10, "bold")).grid(row=0, column=1, sticky="w")
-        ttk.Label(frame, text="Valor", font=("Segoe UI", 10, "bold")).grid(row=0, column=2, sticky="w")
+        win.title("Opciones")
+        win.geometry("920x700")
+
+        canvas = tk.Canvas(win)
+        sc = ttk.Scrollbar(win, orient="vertical", command=canvas.yview)
+        container = ttk.Frame(canvas, padding=12)
+        container.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+        canvas.create_window((0, 0), window=container, anchor="nw")
+        canvas.configure(yscrollcommand=sc.set)
+        canvas.pack(side="left", fill="both", expand=True)
+        sc.pack(side="right", fill="y")
+
+        ttk.Label(container, text="Rangos de validación", font=("Segoe UI", 11, "bold")).grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 6))
+        ttk.Label(container, text="Parámetro", font=("Segoe UI", 10, "bold")).grid(row=1, column=0, sticky="w")
+        ttk.Label(container, text="Descripción", font=("Segoe UI", 10, "bold")).grid(row=1, column=1, sticky="w")
+        ttk.Label(container, text="Valor", font=("Segoe UI", 10, "bold")).grid(row=1, column=2, sticky="w")
+
         vars_map = {}
-        row = 1
+        row = 2
         for key, label, desc in VALIDATION_FIELDS:
-            ttk.Label(frame, text=label).grid(row=row, column=0, sticky="w")
-            ttk.Label(frame, text=desc, foreground="#444").grid(row=row, column=1, sticky="w")
+            ttk.Label(container, text=label).grid(row=row, column=0, sticky="w")
+            ttk.Label(container, text=desc, foreground="#444").grid(row=row, column=1, sticky="w")
             sv = tk.StringVar(value=str(self.data["validation"].get(key, "")))
-            ttk.Entry(frame, textvariable=sv, width=16).grid(row=row, column=2, sticky="ew")
+            ttk.Entry(container, textvariable=sv, width=16).grid(row=row, column=2, sticky="ew")
             vars_map[key] = sv
             row += 1
-        frame.columnconfigure(1, weight=1)
+
+        row += 1
+        ttk.Separator(container, orient="horizontal").grid(row=row, column=0, columnspan=3, sticky="ew", pady=8)
+        row += 1
+        ttk.Label(container, text="Espesores mínimos por rango (pulgadas)", font=("Segoe UI", 11, "bold")).grid(row=row, column=0, columnspan=3, sticky="w")
+        row += 1
+        ttk.Label(container, text="Rango W18", font=("Segoe UI", 10, "bold")).grid(row=row, column=0, sticky="w")
+        ttk.Label(container, text="D1 mínima (in)", font=("Segoe UI", 10, "bold")).grid(row=row, column=1, sticky="w")
+        ttk.Label(container, text="D2 mínima (in)", font=("Segoe UI", 10, "bold")).grid(row=row, column=2, sticky="w")
+        row += 1
+
+        min_vars = {}
+        minimums_table = self.data.get("minimums_table", {k: v.copy() for k, v in DEFAULT_MINIMUMS_TABLE_IN.items()})
+        order = ["lt_50000", "50k_150k", "150k_500k", "500k_2m", "2m_7m", "gt_7m"]
+        for key in order:
+            r = minimums_table.get(key, DEFAULT_MINIMUMS_TABLE_IN[key])
+            ttk.Label(container, text=r.get("label", key)).grid(row=row, column=0, sticky="w", pady=2)
+            d1v = tk.StringVar(value=str(r.get("D1_min_in", 0.0)))
+            d2v = tk.StringVar(value=str(r.get("D2_min_in", 0.0)))
+            ttk.Entry(container, textvariable=d1v, width=16).grid(row=row, column=1, sticky="ew", pady=2)
+            ttk.Entry(container, textvariable=d2v, width=16).grid(row=row, column=2, sticky="ew", pady=2)
+            min_vars[key] = (d1v, d2v)
+            row += 1
+
+        container.columnconfigure(1, weight=1)
 
         def save_options():
             for k, sv in vars_map.items():
                 self.data["validation"][k] = float(sv.get())
-            win.destroy()
-            messagebox.showinfo("Opciones", "Rangos actualizados.")
 
-        ttk.Button(frame, text="Guardar", command=save_options).grid(row=row + 1, column=2, sticky="e", pady=10)
+            if "minimums_table" not in self.data:
+                self.data["minimums_table"] = {k: v.copy() for k, v in DEFAULT_MINIMUMS_TABLE_IN.items()}
+            for key, (d1v, d2v) in min_vars.items():
+                self.data["minimums_table"][key]["D1_min_in"] = float(d1v.get())
+                self.data["minimums_table"][key]["D2_min_in"] = float(d2v.get())
+
+            win.destroy()
+            messagebox.showinfo("Opciones", "Rangos y mínimos actualizados.")
+
+        ttk.Button(container, text="Guardar", command=save_options).grid(row=row + 1, column=2, sticky="e", pady=10)
 
     def _write_text(self, widget, text):
         widget.configure(state="normal")
@@ -363,7 +405,7 @@ class App:
                 sn1_target=l["sn1_target"], sn2_target=l["sn2_target"], sn3_target=sn3_target,
                 a1=l["a1"], a2=l["a2"], a3=l["a3"], m2=l["m2"], m3=l["m3"],
             )
-            mins = apply_minimums_sequential(calc, w18, l["a1"], l["a2"], l["a3"], l["m2"], l["m3"], sn3_target)
+            mins = apply_minimums_sequential(calc, w18, l["a1"], l["a2"], l["a3"], l["m2"], l["m3"], sn3_target, self.data.get("minimums_table"))
 
             self.data["results"] = {"W18": w18, "SN3_target": sn3_target, "SN3_aashto": sn3_aashto, "Zr": zr, "TF_used": tf, "TF_breakdown": tf_breakdown, "calculated": calc, "with_minimums": mins}
 
