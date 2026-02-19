@@ -1,7 +1,7 @@
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 
-from core.esals import calc_w18, calc_w18_from_daily_esal, calc_truck_factor_detailed
+from core.esals import compute_esals_detailed
 from core.aashto93_flexible import solve_sn_required
 from core.layers import design_thicknesses_sequential, apply_minimums_sequential, DEFAULT_MINIMUMS_TABLE_IN
 from data_io.project_json import save_project, load_project
@@ -18,7 +18,6 @@ HELP_TEXTS = {
     "aadt": "TPDA (AADT): Tránsito Promedio Diario Anual total de vehículos.",
     "dd": "DD (factor direccional): fracción del tránsito en la dirección de diseño.",
     "dl": "DL (factor de carril): fracción del tránsito direccional que usa carril de diseño.",
-    "tf": "TF manual: ESAL por vehículo pesado promedio.",
 }
 
 VALIDATION_FIELDS = [
@@ -54,8 +53,8 @@ class App:
                 "pct_trucks": 100.0,
                 "dd": 0.50,
                 "dl": 0.90,
-                "truck_factor": 1.00,
                 "growth_pct": 3.0,
+                "apply_growth": True,
                 "design_years": 20,
                 "use_detailed_tf": True,
                 "class_input_mode": "share_pct",
@@ -155,8 +154,10 @@ class App:
         self.e_aadt = frm.grid_slaves(row=0, column=1)[0]
         self.v_dd = self._entry_with_help(frm, 1, "DD", "dd")
         self.v_dl = self._entry_with_help(frm, 2, "DL", "dl")
-        self.v_tf = self._entry_with_help(frm, 3, "TF manual", "tf", "ESAL/veh pesado")
-        self.v_growth = self._entry_with_help(frm, 4, "Crecimiento", "growth", "%")
+        self.v_growth = self._entry_with_help(frm, 3, "Crecimiento", "growth", "%")
+
+        self.v_apply_growth = tk.BooleanVar(value=True)
+        ttk.Checkbutton(frm, text="Aplicar crecimiento del tránsito", variable=self.v_apply_growth).grid(row=4, column=0, columnspan=4, sticky="w")
 
         ttk.Label(frm, text="Años de diseño").grid(row=5, column=0, sticky="w")
         self.v_years = tk.StringVar()
@@ -303,7 +304,7 @@ class App:
     def _load_to_form(self):
         t = self.data["traffic"]; a = self.data["aashto"]; l = self.data["layers"]
         self.v_aadt.set(str(t["aadt_total"])); self.v_dd.set(str(t["dd"])); self.v_dl.set(str(t["dl"]))
-        self.v_tf.set(str(t["truck_factor"])); self.v_growth.set(str(t["growth_pct"])); self.v_years.set(str(t["design_years"])); self.v_use_detailed.set(bool(t.get("use_detailed_tf", False))); self.v_class_input_mode.set(t.get("class_input_mode", "share_pct"))
+        self.v_growth.set(str(t["growth_pct"])); self.v_apply_growth.set(bool(t.get("apply_growth", True))); self.v_years.set(str(t["design_years"])); self.v_use_detailed.set(bool(t.get("use_detailed_tf", True))); self.v_class_input_mode.set(t.get("class_input_mode", "share_pct"))
         for idx, row in enumerate(t.get("truck_classes", [])):
             if idx < len(self.class_rows):
                 en, n, s_v, c_v, e = self.class_rows[idx]
@@ -318,7 +319,7 @@ class App:
     def _read_form_to_data(self):
         t = self.data["traffic"]; a = self.data["aashto"]; l = self.data["layers"]
         t["aadt_total"] = float(self.v_aadt.get()); t["pct_trucks"] = 100.0; t["dd"] = float(self.v_dd.get()); t["dl"] = float(self.v_dl.get())
-        t["truck_factor"] = float(self.v_tf.get()); t["growth_pct"] = float(self.v_growth.get()); t["design_years"] = int(float(self.v_years.get())); t["use_detailed_tf"] = bool(self.v_use_detailed.get()); t["class_input_mode"] = self.v_class_input_mode.get()
+        t["growth_pct"] = float(self.v_growth.get()); t["apply_growth"] = bool(self.v_apply_growth.get()); t["design_years"] = int(float(self.v_years.get())); t["use_detailed_tf"] = True; t["class_input_mode"] = self.v_class_input_mode.get()
         classes = []
         for en, n, s_v, c_v, e in self.class_rows:
             if n.get().strip() or s_v.get().strip() or c_v.get().strip() or e.get().strip():
@@ -343,6 +344,7 @@ class App:
         total = 0.0
         for en, _, _, c_v, _ in self.class_rows:
             if not en.get():
+                c_v.set("0")
                 continue
             try:
                 total += float(c_v.get() or 0)
@@ -362,6 +364,9 @@ class App:
 
     def _validate_ranges(self):
         t = self.data["traffic"]; a = self.data["aashto"]; v = self.data["validation"]
+        if t.get("apply_growth", True) and t["growth_pct"] < 0:
+            raise ValueError("Si aplicas crecimiento, la tasa debe ser >= 0")
+
         checks = [
             ("TPDA", t["aadt_total"], v["aadt_min"], v["aadt_max"], "Ajusta TPDA o cambia rango en Opciones."),
             ("DD", t["dd"], v["dd_min"], v["dd_max"], "Revisa factor direccional."),
@@ -482,50 +487,46 @@ class App:
     def _compute_traffic_load(self):
         t = self.data["traffic"]
         mode = t.get("class_input_mode", "share_pct")
-        if t.get("use_detailed_tf"):
-            tf, breakdown = calc_truck_factor_detailed(t.get("truck_classes", []), mode=mode, aadt_total=t["aadt_total"] if mode == "count" else None)
-            if mode == "count":
-                w18 = calc_w18_from_daily_esal(
-                    daily_esal=breakdown["daily_esal"],
-                    dd=t["dd"],
-                    dl=t["dl"],
-                    growth_pct=t["growth_pct"],
-                    years=t["design_years"],
-                )
-                return w18, tf, breakdown
-
-            daily_esal = t["aadt_total"] * tf
-            w18 = calc_w18_from_daily_esal(
-                daily_esal=daily_esal,
-                dd=t["dd"],
-                dl=t["dl"],
-                growth_pct=t["growth_pct"],
-                years=t["design_years"],
-            )
-            return w18, tf, breakdown
-
-        w18 = calc_w18(
-            aadt_total=t["aadt_total"],
-            pct_trucks=t["pct_trucks"] / 100.0,
+        result = compute_esals_detailed(
+            vehicle_classes=t.get("truck_classes", []),
+            mode=mode,
+            tpda_total=t["aadt_total"],
             dd=t["dd"],
             dl=t["dl"],
-            truck_factor=t["truck_factor"],
+            apply_growth=bool(t.get("apply_growth", True)),
             growth_pct=t["growth_pct"],
             years=t["design_years"],
         )
-        return w18, t["truck_factor"], None
+        return result["W18"], result
 
+
+
+    def _format_esal_breakdown(self, esal_detail: dict) -> str:
+        lines = []
+        lines.append("DESGLOSE ESAL POR TIPO\n")
+        lines.append("Tipo            ADT_i        EALF        ESAL_i\n")
+        lines.append("-"*54 + "\n")
+        for r in esal_detail.get("rows", []):
+            lines.append(f"{r['name']:<12}{r['ADT_i']:>10.2f}{r['ealf']:>12.3f}{r['ESAL_i']:>20.2f}\n")
+        lines.append("\n")
+        lines.append(f"Factor B: {esal_detail.get('B',0):.6f}\n")
+        if esal_detail.get("mode") == "share_pct":
+            lines.append(f"Suma participación: {esal_detail.get('total_share_pct',0):.2f}%\n")
+        lines.append(f"ΣESAL: {esal_detail.get('sum_esal',0):,.2f}\n")
+        lines.append(f"W18: {esal_detail.get('W18',0):,.2f}\n")
+        return "".join(lines)
 
     def on_calculate_esals(self):
         try:
             self._read_form_to_data()
-            w18, tf, breakdown = self._compute_traffic_load()
+            w18, esal_detail = self._compute_traffic_load()
             self.data.setdefault("results", {})["W18"] = w18
-            self.data["results"]["TF_used"] = tf
-            self.data["results"]["TF_breakdown"] = breakdown
+            self.data["results"]["ESAL_detail"] = esal_detail
             self.v_w18_traffic.set(f"{w18:,.0f}")
             self.v_w18_big.set(f"{w18:,.0f}")
+            self._write_text(self.txt_calc, self._format_esal_breakdown(esal_detail))
             self.v_esal_warn.set("⚠ Solo se han calculado ESALs. Ejecuta 'Calcular' para actualizar espesores.")
+            self.nb.select(self.tab_traffic)
             messagebox.showwarning("ESALs", "Solo se calculó tránsito/ESALs. Ejecuta 'Calcular' para actualizar espesores y costos.")
         except Exception as e:
             messagebox.showerror("ESALs", f"No se pudo calcular ESALs:\n{e}")
@@ -567,7 +568,7 @@ class App:
         try:
             self._read_form_to_data()
             t = self.data["traffic"]; a = self.data["aashto"]; l = self.data["layers"]
-            w18, tf, tf_breakdown = self._compute_traffic_load()
+            w18, esal_detail = self._compute_traffic_load()
             sn3_aashto, zr = solve_sn_required(w18=w18, reliability_pct=a["reliability_pct"], so=a["so"], pi=a["pi"], pt=a["pt"], mr_mpa=a["mr_mpa"])
             sn3_target = l["sn3_target"]
 
@@ -579,7 +580,7 @@ class App:
 
             costs = self._compute_costs(calc, mins)
 
-            self.data["results"] = {"W18": w18, "SN3_target": sn3_target, "SN3_aashto": sn3_aashto, "Zr": zr, "TF_used": tf, "TF_breakdown": tf_breakdown, "calculated": calc, "with_minimums": mins, "costs": costs}
+            self.data["results"] = {"W18": w18, "SN3_target": sn3_target, "SN3_aashto": sn3_aashto, "Zr": zr, "ESAL_detail": esal_detail, "calculated": calc, "with_minimums": mins, "costs": costs}
             self.v_w18_big.set(f"{w18:,.0f}")
             self.v_w18_traffic.set(f"{w18:,.0f}")
             self.v_esal_warn.set("")
@@ -595,6 +596,7 @@ class App:
                 out.append("- ESAL diario = TPDA * TF.\n")
                 out.append("- W18 = 365 * ESAL_diario * DD * DL * factor_crecimiento.\n\n")
             out.append(f"W18 acumulado: {w18:,.0f}\n")
+            out.append(f"Factor B: {esal_detail['B']:.6f} | ΣESAL: {esal_detail['sum_esal']:,.2f}\n\n")
             out.append(f"SN3 objetivo (usuario): {fnum(sn3_target,3)}\n")
             out.append(f"SN3 estimado por AASHTO (referencia): {fnum(sn3_aashto,3)}\n")
             out.append(f"SN1 objetivo: {fnum(l['sn1_target'],3)} | SN2 objetivo: {fnum(l['sn2_target'],3)}\n\n")
@@ -611,7 +613,7 @@ class App:
             out.append(f"SN corregidos sumados: {fnum(mins['SN_sum'],3)}\n")
             out.append("Observación: En ajuste con mínimos se toman SIEMPRE D1 y D2 de la tabla/configuración de Opciones.\n")
 
-            calc_txt = self._build_calculos_text(calc, mins, l, sn3_target)
+            calc_txt = self._build_calculos_text(calc, mins, l, sn3_target) + "\n\n" + self._format_esal_breakdown(esal_detail)
             self._write_text(self.txt, "".join(out))
             self._write_text(self.txt_calc, calc_txt)
             self._draw_sections(calc, mins)
@@ -719,7 +721,7 @@ class App:
             data_lines = [
                 f"Proyecto: {self.data.get('project', {}).get('name', 'N/A')}",
                 f"TPDA: {t['aadt_total']:.2f} | DD: {t['dd']:.3f} | DL: {t['dl']:.3f}",
-                f"Crecimiento: {t['growth_pct']:.2f}% | Años: {t['design_years']} | TF usado: {rs['TF_used']:.3f}",
+                f"Crecimiento: {t['growth_pct']:.2f}% | Aplicar crecimiento: {t.get('apply_growth', True)} | Años: {t['design_years']}",
                 f"R: {a['reliability_pct']:.2f} | So: {a['so']:.3f} | Pi: {a['pi']:.3f} | Pt: {a['pt']:.3f} | Mr(MPa): {a['mr_mpa']:.3f}",
                 f"a1:{l['a1']:.3f} a2:{l['a2']:.3f} a3:{l['a3']:.3f} m2:{l['m2']:.3f} m3:{l['m3']:.3f}",
                 f"SN1:{l['sn1_target']:.3f} SN2:{l['sn2_target']:.3f} SN3_obj:{l['sn3_target']:.3f} SN3_ref:{rs['SN3_aashto']:.3f}",
