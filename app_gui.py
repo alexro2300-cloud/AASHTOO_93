@@ -1,7 +1,7 @@
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 
-from core.esals import calc_w18, calc_truck_factor_detailed
+from core.esals import calc_w18, calc_w18_from_daily_esal, calc_truck_factor_detailed
 from core.aashto93_flexible import solve_sn_required
 from core.layers import design_thicknesses_sequential, apply_minimums_sequential, DEFAULT_MINIMUMS_TABLE_IN
 from data_io.project_json import save_project, load_project
@@ -62,18 +62,19 @@ class App:
                 "growth_pct": 3.0,
                 "design_years": 20,
                 "use_detailed_tf": True,
+                "class_input_mode": "share_pct",
                 "truck_classes": [
-                    {"name": "C2", "share_pct": 10.0, "ealf": 0.30, "ap": 1.0, "enabled": True},
-                    {"name": "C3", "share_pct": 10.0, "ealf": 0.50, "ap": 1.0, "enabled": True},
-                    {"name": "C2-R2", "share_pct": 10.0, "ealf": 0.80, "ap": 1.0, "enabled": True},
-                    {"name": "C3-R2", "share_pct": 10.0, "ealf": 1.00, "ap": 1.0, "enabled": True},
-                    {"name": "C2-R3", "share_pct": 10.0, "ealf": 1.10, "ap": 1.0, "enabled": True},
-                    {"name": "C3-R3", "share_pct": 10.0, "ealf": 1.30, "ap": 1.0, "enabled": True},
-                    {"name": "T2-S1", "share_pct": 10.0, "ealf": 1.40, "ap": 1.0, "enabled": True},
-                    {"name": "T2-S2", "share_pct": 10.0, "ealf": 1.60, "ap": 1.0, "enabled": True},
-                    {"name": "T2-S3", "share_pct": 10.0, "ealf": 1.90, "ap": 1.0, "enabled": True},
-                    {"name": "T3-S2", "share_pct": 5.0, "ealf": 2.10, "ap": 1.0, "enabled": True},
-                    {"name": "T3-S3", "share_pct": 5.0, "ealf": 2.40, "ap": 1.0, "enabled": True},
+                    {"name": "C2", "share_pct": 10.0, "count": 1000.0, "ealf": 0.30, "ap": 1.0, "enabled": True},
+                    {"name": "C3", "share_pct": 10.0, "count": 1000.0, "ealf": 0.50, "ap": 1.0, "enabled": True},
+                    {"name": "C2-R2", "share_pct": 10.0, "count": 1000.0, "ealf": 0.80, "ap": 1.0, "enabled": True},
+                    {"name": "C3-R2", "share_pct": 10.0, "count": 1000.0, "ealf": 1.00, "ap": 1.0, "enabled": True},
+                    {"name": "C2-R3", "share_pct": 10.0, "count": 1000.0, "ealf": 1.10, "ap": 1.0, "enabled": True},
+                    {"name": "C3-R3", "share_pct": 10.0, "count": 1000.0, "ealf": 1.30, "ap": 1.0, "enabled": True},
+                    {"name": "T2-S1", "share_pct": 10.0, "count": 1000.0, "ealf": 1.40, "ap": 1.0, "enabled": True},
+                    {"name": "T2-S2", "share_pct": 10.0, "count": 1000.0, "ealf": 1.60, "ap": 1.0, "enabled": True},
+                    {"name": "T2-S3", "share_pct": 10.0, "count": 1000.0, "ealf": 1.90, "ap": 1.0, "enabled": True},
+                    {"name": "T3-S2", "share_pct": 5.0, "count": 500.0, "ealf": 2.10, "ap": 1.0, "enabled": True},
+                    {"name": "T3-S3", "share_pct": 5.0, "count": 500.0, "ealf": 2.40, "ap": 1.0, "enabled": True},
                 ],
             },
             "aashto": {"reliability_pct": 95.0, "so": 0.49, "pi": 4.2, "pt": 2.5, "mr_mpa": 70.0},
@@ -163,9 +164,13 @@ class App:
         self.v_use_detailed = tk.BooleanVar()
         ttk.Checkbutton(frm, text="Usar TF detallado por tipo de vehículo", variable=self.v_use_detailed).grid(row=7, column=0, columnspan=4, sticky="w")
 
+        self.v_class_input_mode = tk.StringVar(value="share_pct")
+        ttk.Radiobutton(frm, text="Entrada por % participación", variable=self.v_class_input_mode, value="share_pct").grid(row=8, column=0, columnspan=2, sticky="w")
+        ttk.Radiobutton(frm, text="Entrada por tránsito (veh/día)", variable=self.v_class_input_mode, value="count").grid(row=8, column=2, columnspan=2, sticky="w")
+
         cls = ttk.LabelFrame(self.tab_traffic, text="Clasificación vehicular (activar/desactivar por tipo)", padding=10)
         cls.pack(fill="both", expand=True, pady=(10, 0))
-        headers = ["Usar", "Nomenclatura", "Participación %", "EALF", "Ap"]
+        headers = ["Usar", "Nomenclatura", "Participación %", "Tránsito (veh/día)", "EALF", "Ap"]
         for i, h in enumerate(headers):
             ttk.Label(cls, text=h).grid(row=0, column=i, sticky="w")
 
@@ -174,14 +179,16 @@ class App:
             en = tk.BooleanVar(value=True)
             name_v = tk.StringVar()
             share_v = tk.StringVar()
+            count_v = tk.StringVar()
             ealf_v = tk.StringVar()
             ap_v = tk.StringVar(value="1.0")
             ttk.Checkbutton(cls, variable=en).grid(row=i + 1, column=0, sticky="w")
             ttk.Entry(cls, textvariable=name_v, width=12).grid(row=i + 1, column=1, sticky="ew", padx=2, pady=2)
             ttk.Entry(cls, textvariable=share_v, width=10).grid(row=i + 1, column=2, sticky="ew", padx=2, pady=2)
-            ttk.Entry(cls, textvariable=ealf_v, width=10).grid(row=i + 1, column=3, sticky="ew", padx=2, pady=2)
-            ttk.Entry(cls, textvariable=ap_v, width=8).grid(row=i + 1, column=4, sticky="ew", padx=2, pady=2)
-            self.class_rows.append((en, name_v, share_v, ealf_v, ap_v))
+            ttk.Entry(cls, textvariable=count_v, width=12).grid(row=i + 1, column=3, sticky="ew", padx=2, pady=2)
+            ttk.Entry(cls, textvariable=ealf_v, width=10).grid(row=i + 1, column=4, sticky="ew", padx=2, pady=2)
+            ttk.Entry(cls, textvariable=ap_v, width=8).grid(row=i + 1, column=5, sticky="ew", padx=2, pady=2)
+            self.class_rows.append((en, name_v, share_v, count_v, ealf_v, ap_v))
 
     def _build_tab_aashto(self):
         frm = ttk.LabelFrame(self.tab_aashto, text="Parámetros de diseño", padding=12)
@@ -243,22 +250,22 @@ class App:
     def _load_to_form(self):
         t = self.data["traffic"]; a = self.data["aashto"]; l = self.data["layers"]
         self.v_aadt.set(str(t["aadt_total"])); self.v_pct_trucks.set(str(t["pct_trucks"])); self.v_dd.set(str(t["dd"])); self.v_dl.set(str(t["dl"]))
-        self.v_tf.set(str(t["truck_factor"])); self.v_growth.set(str(t["growth_pct"])); self.v_years.set(str(t["design_years"])); self.v_use_detailed.set(bool(t.get("use_detailed_tf", False)))
+        self.v_tf.set(str(t["truck_factor"])); self.v_growth.set(str(t["growth_pct"])); self.v_years.set(str(t["design_years"])); self.v_use_detailed.set(bool(t.get("use_detailed_tf", False))); self.v_class_input_mode.set(t.get("class_input_mode", "share_pct"))
         for idx, row in enumerate(t.get("truck_classes", [])):
             if idx < len(self.class_rows):
-                en, n, s_v, e, ap = self.class_rows[idx]
-                en.set(bool(row.get("enabled", True))); n.set(str(row.get("name", ""))); s_v.set(str(row.get("share_pct", ""))); e.set(str(row.get("ealf", ""))); ap.set(str(row.get("ap", 1.0)))
+                en, n, s_v, c_v, e, ap = self.class_rows[idx]
+                en.set(bool(row.get("enabled", True))); n.set(str(row.get("name", ""))); s_v.set(str(row.get("share_pct", ""))); c_v.set(str(row.get("count", ""))); e.set(str(row.get("ealf", ""))); ap.set(str(row.get("ap", 1.0)))
         self.v_rel.set(str(a["reliability_pct"])); self.v_so.set(str(a["so"])); self.v_pi.set(str(a["pi"])); self.v_pt.set(str(a["pt"])); self.v_mr.set(str(a["mr_mpa"]))
         self.v_a1.set(str(l["a1"])); self.v_a2.set(str(l["a2"])); self.v_a3.set(str(l["a3"])); self.v_m2.set(str(l["m2"])); self.v_m3.set(str(l["m3"])); self.v_sn1.set(str(l["sn1_target"])); self.v_sn2.set(str(l["sn2_target"])); self.v_sn3.set(str(l["sn3_target"]))
 
     def _read_form_to_data(self):
         t = self.data["traffic"]; a = self.data["aashto"]; l = self.data["layers"]
         t["aadt_total"] = float(self.v_aadt.get()); t["pct_trucks"] = float(self.v_pct_trucks.get()); t["dd"] = float(self.v_dd.get()); t["dl"] = float(self.v_dl.get())
-        t["truck_factor"] = float(self.v_tf.get()); t["growth_pct"] = float(self.v_growth.get()); t["design_years"] = int(float(self.v_years.get())); t["use_detailed_tf"] = bool(self.v_use_detailed.get())
+        t["truck_factor"] = float(self.v_tf.get()); t["growth_pct"] = float(self.v_growth.get()); t["design_years"] = int(float(self.v_years.get())); t["use_detailed_tf"] = bool(self.v_use_detailed.get()); t["class_input_mode"] = self.v_class_input_mode.get()
         classes = []
-        for en, n, s_v, e, ap in self.class_rows:
-            if n.get().strip() or s_v.get().strip() or e.get().strip():
-                classes.append({"enabled": bool(en.get()), "name": n.get().strip() or "Clase", "share_pct": float(s_v.get() or 0), "ealf": float(e.get() or 0), "ap": float(ap.get() or 1)})
+        for en, n, s_v, c_v, e, ap in self.class_rows:
+            if n.get().strip() or s_v.get().strip() or c_v.get().strip() or e.get().strip():
+                classes.append({"enabled": bool(en.get()), "name": n.get().strip() or "Clase", "share_pct": float(s_v.get() or 0), "count": float(c_v.get() or 0), "ealf": float(e.get() or 0), "ap": float(ap.get() or 1)})
         t["truck_classes"] = classes
         a["reliability_pct"] = float(self.v_rel.get()); a["so"] = float(self.v_so.get()); a["pi"] = float(self.v_pi.get()); a["pt"] = float(self.v_pt.get()); a["mr_mpa"] = float(self.v_mr.get())
         l["a1"] = float(self.v_a1.get()); l["a2"] = float(self.v_a2.get()); l["a3"] = float(self.v_a3.get()); l["m2"] = float(self.v_m2.get()); l["m3"] = float(self.v_m3.get())
@@ -385,19 +392,48 @@ class App:
             return
         save_project(self.data, path)
 
-    def _compute_tf(self):
+    def _compute_traffic_load(self):
         t = self.data["traffic"]
+        mode = t.get("class_input_mode", "share_pct")
         if t.get("use_detailed_tf"):
-            return calc_truck_factor_detailed(t.get("truck_classes", []))
-        return t["truck_factor"], None
+            tf, breakdown = calc_truck_factor_detailed(t.get("truck_classes", []), mode=mode, aadt_total=t["aadt_total"] if mode == "count" else None)
+            if mode == "count":
+                w18 = calc_w18_from_daily_esal(
+                    daily_esal=breakdown["daily_esal"],
+                    dd=t["dd"],
+                    dl=t["dl"],
+                    growth_pct=t["growth_pct"],
+                    years=t["design_years"],
+                )
+                return w18, tf, breakdown
+
+            w18 = calc_w18(
+                aadt_total=t["aadt_total"],
+                pct_trucks=t["pct_trucks"] / 100.0,
+                dd=t["dd"],
+                dl=t["dl"],
+                truck_factor=tf,
+                growth_pct=t["growth_pct"],
+                years=t["design_years"],
+            )
+            return w18, tf, breakdown
+
+        w18 = calc_w18(
+            aadt_total=t["aadt_total"],
+            pct_trucks=t["pct_trucks"] / 100.0,
+            dd=t["dd"],
+            dl=t["dl"],
+            truck_factor=t["truck_factor"],
+            growth_pct=t["growth_pct"],
+            years=t["design_years"],
+        )
+        return w18, t["truck_factor"], None
 
     def on_calculate(self):
         try:
             self._read_form_to_data()
             t = self.data["traffic"]; a = self.data["aashto"]; l = self.data["layers"]
-            tf, tf_breakdown = self._compute_tf()
-
-            w18 = calc_w18(aadt_total=t["aadt_total"], pct_trucks=t["pct_trucks"] / 100.0, dd=t["dd"], dl=t["dl"], truck_factor=tf, growth_pct=t["growth_pct"], years=t["design_years"])
+            w18, tf, tf_breakdown = self._compute_traffic_load()
             sn3_aashto, zr = solve_sn_required(w18=w18, reliability_pct=a["reliability_pct"], so=a["so"], pi=a["pi"], pt=a["pt"], mr_mpa=a["mr_mpa"])
             sn3_target = l["sn3_target"]
 
@@ -415,12 +451,12 @@ class App:
             out.append(f"SN3 objetivo (usuario): {fnum(sn3_target,3)}\n")
             out.append(f"SN3 estimado por AASHTO (referencia): {fnum(sn3_aashto,3)}\n")
             out.append(f"SN1 objetivo: {fnum(l['sn1_target'],3)} | SN2 objetivo: {fnum(l['sn2_target'],3)}\n\n")
-            out.append("1) Espesores calculados (SIN mínimos)\n")
+            out.append("1) Espesores calculados (SIN mínimos)\n\n")
             out.append(f"- D1: {fnum(calc['D1_in'],2)} in | {fnum(calc['D1_cm'],2)} cm\n")
             out.append(f"- D2: {fnum(calc['D2_in'],2)} in | {fnum(calc['D2_cm'],2)} cm\n")
             out.append(f"- D3: {fnum(calc['D3_in'],2)} in | {fnum(calc['D3_cm'],2)} cm\n")
             out.append(f"SN corregidos sumados: {fnum(calc['SN_sum'],3)}\n\n")
-            out.append("2) Espesores ajustados con mínimos sugeridos\n")
+            out.append("\n2) Espesores ajustados con mínimos sugeridos\n\n")
             out.append(f"Rango tabla: {mins['minimum_table']['range_label']}\n")
             out.append(f"- D1: {fnum(mins['D1_in'],2)} in | {fnum(mins['D1_cm'],2)} cm\n")
             out.append(f"- D2: {fnum(mins['D2_in'],2)} in | {fnum(mins['D2_cm'],2)} cm\n")
@@ -451,7 +487,7 @@ class App:
         lines.append(f"D3 redondeado (0.5 hacia arriba) = {calc['D3_in']:.2f} in\n")
         lines.append(f"SN3* = D3red*A3*M3 = {calc['D3_in']:.2f}*{l['a3']:.3f}*{l['m3']:.3f} = {calc['SN3_star']:.3f}\n")
         lines.append(f"Comprobación suma: SN1*+SN2*+SN3* = {calc['SN_sum']:.3f}\n")
-        lines.append(f"Criterio solicitado (<SN3): {calc['SN_sum']:.3f} < {sn3:.3f} -> {calc['criterion_user_lt_sn3']}\n")
+        lines.append("\n")
         lines.append(f"Criterio estructural (>=SN3): {calc['SN_sum']:.3f} >= {sn3:.3f} -> {calc['criterion_meets_or_exceeds']}\n\n")
 
         lines.append("B) AJUSTE CON MÍNIMOS\n")
@@ -493,22 +529,77 @@ class App:
         try:
             from reportlab.lib.pagesizes import letter
             from reportlab.pdfgen import canvas
+
             rs = self.data["results"]
+            t = self.data["traffic"]
+            a = self.data["aashto"]
+            l = self.data["layers"]
+            calc = rs["calculated"]
+            mins = rs["with_minimums"]
+
             c = canvas.Canvas(path, pagesize=letter)
-            y = 760
+            page_w, page_h = letter
+            y = page_h - 36
+
             c.setFont("Helvetica-Bold", 13)
-            c.drawString(40, y, "Reporte de Diseño - AASHTO 1993 Flexible")
-            y -= 30
-            c.setFont("Helvetica", 10)
-            for ln in [
+            c.drawString(36, y, "Reporte de Diseño - AASHTO 1993 Flexible")
+            y -= 22
+            c.setFont("Helvetica", 9)
+
+            data_lines = [
+                f"Proyecto: {self.data.get('project', {}).get('name', 'N/A')}",
+                f"TPDA: {t['aadt_total']:.2f} | %Pesados: {t['pct_trucks']:.2f} | DD: {t['dd']:.3f} | DL: {t['dl']:.3f}",
+                f"Crecimiento: {t['growth_pct']:.2f}% | Años: {t['design_years']} | TF usado: {rs['TF_used']:.3f}",
+                f"R: {a['reliability_pct']:.2f} | So: {a['so']:.3f} | Pi: {a['pi']:.3f} | Pt: {a['pt']:.3f} | Mr(MPa): {a['mr_mpa']:.3f}",
+                f"a1:{l['a1']:.3f} a2:{l['a2']:.3f} a3:{l['a3']:.3f} m2:{l['m2']:.3f} m3:{l['m3']:.3f}",
+                f"SN1:{l['sn1_target']:.3f} SN2:{l['sn2_target']:.3f} SN3_obj:{l['sn3_target']:.3f} SN3_ref:{rs['SN3_aashto']:.3f}",
                 f"W18: {rs['W18']:,.0f}",
-                f"SN3 objetivo (usuario): {rs['SN3_target']:.3f}",
-                f"SN3 estimado AASHTO (referencia): {rs['SN3_aashto']:.3f}",
-                f"D calculados (in): {rs['calculated']['D1_in']:.2f}, {rs['calculated']['D2_in']:.2f}, {rs['calculated']['D3_in']:.2f}",
-                f"D con mínimos (in): {rs['with_minimums']['D1_in']:.2f}, {rs['with_minimums']['D2_in']:.2f}, {rs['with_minimums']['D3_in']:.2f}",
-            ]:
-                c.drawString(40, y, ln)
-                y -= 16
+            ]
+            for ln in data_lines:
+                c.drawString(36, y, ln)
+                y -= 13
+
+            y -= 8
+            c.setFont("Helvetica-Bold", 10)
+            c.drawString(36, y, "Desglose de cálculos")
+            y -= 14
+            c.setFont("Helvetica", 8)
+            for ln in self._build_calculos_text(calc, mins, l, l['sn3_target']).splitlines():
+                if y < 80:
+                    c.showPage()
+                    y = page_h - 36
+                    c.setFont("Helvetica", 8)
+                c.drawString(36, y, ln[:140])
+                y -= 10
+
+            def draw_section_pdf(x, y_top, d1, d2, d3, title):
+                c.setFont("Helvetica-Bold", 9)
+                c.drawString(x, y_top + 8, title)
+                total = max(d1 + d2 + d3, 0.1)
+                scale = 120 / total
+                w = 160
+                y = y_top - 2
+                for name, thk, color in [("Carpeta", d1, (0.28, 0.31, 0.66)), ("Base", d2, (0.82, 0.69, 0.43)), ("Subbase", d3, (0.63, 0.70, 0.44))]:
+                    h = thk * scale
+                    r,g,b = color
+                    c.setFillColorRGB(r,g,b)
+                    c.rect(x, y - h, w, h, fill=1, stroke=1)
+                    c.setFillColorRGB(1,1,1)
+                    c.drawString(x + 4, y - h/2, f"{name}: {thk:.2f} in")
+                    y -= h
+                c.setFillColorRGB(0.61,0.49,0.37)
+                c.rect(x, y - 25, w, 25, fill=1, stroke=1)
+                c.setFillColorRGB(1,1,1)
+                c.drawString(x + 4, y - 14, "Subrasante")
+                c.setFillColorRGB(0,0,0)
+
+            if y < 220:
+                c.showPage()
+                y = page_h - 36
+            y -= 20
+            draw_section_pdf(36, y, calc['D1_in'], calc['D2_in'], calc['D3_in'], "Sección calculada")
+            draw_section_pdf(240, y, mins['D1_in'], mins['D2_in'], mins['D3_in'], "Sección con mínimos")
+
             c.save()
             messagebox.showinfo("PDF", f"Reporte exportado:\n{path}")
         except Exception as e:
