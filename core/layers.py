@@ -117,8 +117,9 @@ def apply_minimums_sequential(calc_result: dict, w18: float, a1, a2, a3, m2, m3,
     d1_min_round = round_half_up(mins["D1_min_in"])
     d2_min_round = round_half_up(mins["D2_min_in"])
 
-    d1_adj = max(calc_result["D1_in"], d1_min_round)
-    d2_adj = max(calc_result["D2_in"], d2_min_round)
+    # Regla solicitada: en ajuste con mínimos SIEMPRE usar los mínimos configurados en Opciones
+    d1_adj = d1_min_round
+    d2_adj = d2_min_round
 
     sn1_star = d1_adj * a1
     sn2_star = d2_adj * a2 * m2
@@ -142,7 +143,7 @@ def apply_minimums_sequential(calc_result: dict, w18: float, a1, a2, a3, m2, m3,
         "SN2_star": sn2_star,
         "SN3_star": sn3_star,
         "SN_sum": sn_sum,
-        "minimums_govern": (d1_adj > calc_result["D1_in"] + 1e-9) or (d2_adj > calc_result["D2_in"] + 1e-9),
+        "minimums_govern": True,
         "criterion_user_lt_sn3": sn_sum < sn3_target,
         "criterion_meets_or_exceeds": sn_sum >= sn3_target,
     }

@@ -426,7 +426,7 @@ class App:
             out.append(f"- D2: {fnum(mins['D2_in'],2)} in | {fnum(mins['D2_cm'],2)} cm\n")
             out.append(f"- D3: {fnum(mins['D3_in'],2)} in | {fnum(mins['D3_cm'],2)} cm\n")
             out.append(f"SN corregidos sumados: {fnum(mins['SN_sum'],3)}\n")
-            out.append("Observación: " + ("Mínimos SÍ modificaron la solución." if mins["minimums_govern"] else "Mínimos NO modificaron la solución.") + "\n")
+            out.append("Observación: En ajuste con mínimos se toman SIEMPRE D1 y D2 de la tabla/configuración de Opciones.\n")
 
             calc_txt = self._build_calculos_text(calc, mins, l, sn3_target)
             self._write_text(self.txt, "".join(out))
@@ -456,8 +456,8 @@ class App:
 
         lines.append("B) AJUSTE CON MÍNIMOS\n")
         lines.append(f"Tabla 7-2 aplicada: {mins['minimum_table']['range_label']}\n")
-        lines.append(f"D1 ajustado = max(D1_calc, D1_min) = max({calc['D1_in']:.2f}, {mins['minimum_table']['D1_min_in']:.2f}) = {mins['D1_in']:.2f} in\n")
-        lines.append(f"D2 ajustado = max(D2_calc, D2_min) = max({calc['D2_in']:.2f}, {mins['minimum_table']['D2_min_in']:.2f}) = {mins['D2_in']:.2f} in\n")
+        lines.append(f"D1 ajustado = D1_min(opciones) = {mins['minimum_table']['D1_min_in']:.2f} in -> {mins['D1_in']:.2f} in\n")
+        lines.append(f"D2 ajustado = D2_min(opciones) = {mins['minimum_table']['D2_min_in']:.2f} in -> {mins['D2_in']:.2f} in\n")
         lines.append(f"SN1*min = D1_adj*A1 = {mins['SN1_star']:.3f}\n")
         lines.append(f"SN2*min = D2_adj*A2*M2 = {mins['SN2_star']:.3f}\n")
         lines.append(f"D3_min = (SN3-(SN1*min+SN2*min))/(A3*M3) = {mins['D3_raw_in']:.3f} in\n")
