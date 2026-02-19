@@ -16,7 +16,6 @@ def fnum(x, nd=3):
 
 HELP_TEXTS = {
     "aadt": "TPDA (AADT): Tránsito Promedio Diario Anual total de vehículos.",
-    "pct_trucks": "% Pesados: proporción de vehículos pesados respecto al TPDA total.",
     "dd": "DD (factor direccional): fracción del tránsito en la dirección de diseño.",
     "dl": "DL (factor de carril): fracción del tránsito direccional que usa carril de diseño.",
     "tf": "TF manual: ESAL por vehículo pesado promedio.",
@@ -25,8 +24,6 @@ HELP_TEXTS = {
 VALIDATION_FIELDS = [
     ("aadt_min", "TPDA mínimo", "Límite inferior aceptado para TPDA total."),
     ("aadt_max", "TPDA máximo", "Límite superior aceptado para TPDA total."),
-    ("pct_trucks_min", "% pesados mínimo", "Límite inferior del porcentaje de pesados."),
-    ("pct_trucks_max", "% pesados máximo", "Límite superior del porcentaje de pesados."),
     ("dd_min", "DD mínimo", "Límite inferior del factor direccional DD."),
     ("dd_max", "DD máximo", "Límite superior del factor direccional DD."),
     ("dl_min", "DL mínimo", "Límite inferior del factor de carril DL."),
@@ -54,7 +51,7 @@ class App:
             "project": {"name": "Proyecto 01"},
             "traffic": {
                 "aadt_total": 10000.0,
-                "pct_trucks": 15.0,
+                "pct_trucks": 100.0,
                 "dd": 0.50,
                 "dl": 0.90,
                 "truck_factor": 1.00,
@@ -66,16 +63,16 @@ class App:
                     {"name": "A", "share_pct": 25.0, "count": 2500.0, "ealf": 0.05, "enabled": True},
                     {"name": "B", "share_pct": 15.0, "count": 1500.0, "ealf": 0.20, "enabled": True},
                     {"name": "C2", "share_pct": 8.0, "count": 800.0, "ealf": 0.30, "enabled": True},
-                    {"name": "C3", "share_pct": 10.0, "count": 1000.0, "ealf": 0.50, "enabled": True},
-                    {"name": "C2-R2", "share_pct": 10.0, "count": 1000.0, "ealf": 0.80, "enabled": True},
-                    {"name": "C3-R2", "share_pct": 10.0, "count": 1000.0, "ealf": 1.00, "enabled": True},
-                    {"name": "C2-R3", "share_pct": 10.0, "count": 1000.0, "ealf": 1.10, "enabled": True},
-                    {"name": "C3-R3", "share_pct": 10.0, "count": 1000.0, "ealf": 1.30, "enabled": True},
-                    {"name": "T2-S1", "share_pct": 10.0, "count": 1000.0, "ealf": 1.40, "enabled": True},
-                    {"name": "T2-S2", "share_pct": 10.0, "count": 1000.0, "ealf": 1.60, "enabled": True},
-                    {"name": "T2-S3", "share_pct": 10.0, "count": 1000.0, "ealf": 1.90, "enabled": True},
-                    {"name": "T3-S2", "share_pct": 5.0, "count": 500.0, "ealf": 2.10, "enabled": True},
-                    {"name": "T3-S3", "share_pct": 5.0, "count": 500.0, "ealf": 2.40, "enabled": True},
+                    {"name": "C3", "share_pct": 8.0, "count": 800.0, "ealf": 0.50, "enabled": True},
+                    {"name": "C2-R2", "share_pct": 8.0, "count": 800.0, "ealf": 0.80, "enabled": True},
+                    {"name": "C3-R2", "share_pct": 8.0, "count": 800.0, "ealf": 1.00, "enabled": True},
+                    {"name": "C2-R3", "share_pct": 8.0, "count": 800.0, "ealf": 1.10, "enabled": True},
+                    {"name": "C3-R3", "share_pct": 6.0, "count": 600.0, "ealf": 1.30, "enabled": True},
+                    {"name": "T2-S1", "share_pct": 5.0, "count": 500.0, "ealf": 1.40, "enabled": True},
+                    {"name": "T2-S2", "share_pct": 4.0, "count": 400.0, "ealf": 1.60, "enabled": True},
+                    {"name": "T2-S3", "share_pct": 3.0, "count": 300.0, "ealf": 1.90, "enabled": True},
+                    {"name": "T3-S2", "share_pct": 1.5, "count": 150.0, "ealf": 2.10, "enabled": True},
+                    {"name": "T3-S3", "share_pct": 0.5, "count": 50.0, "ealf": 2.40, "enabled": True},
                 ],
             },
             "aashto": {"reliability_pct": 95.0, "so": 0.49, "pi": 4.2, "pt": 2.5, "mr_mpa": 70.0},
@@ -87,7 +84,6 @@ class App:
             },
             "validation": {
                 "aadt_min": 100.0, "aadt_max": 200000.0,
-                "pct_trucks_min": 0.0, "pct_trucks_max": 60.0,
                 "dd_min": 0.3, "dd_max": 0.7,
                 "dl_min": 0.5, "dl_max": 1.0,
                 "growth_min": -2.0, "growth_max": 10.0,
@@ -156,24 +152,22 @@ class App:
         for c in range(8):
             frm.columnconfigure(c, weight=1 if c in (1, 5) else 0)
         self.v_aadt = self._entry_with_help(frm, 0, "TPDA total", "aadt", "veh/día")
-        self.v_pct_trucks = self._entry_with_help(frm, 1, "% pesados", "pct_trucks", "%")
         self.e_aadt = frm.grid_slaves(row=0, column=1)[0]
-        self.e_pct = frm.grid_slaves(row=1, column=1)[0]
-        self.v_dd = self._entry_with_help(frm, 2, "DD", "dd")
-        self.v_dl = self._entry_with_help(frm, 3, "DL", "dl")
-        self.v_tf = self._entry_with_help(frm, 4, "TF manual", "tf", "ESAL/veh pesado")
-        self.v_growth = self._entry_with_help(frm, 5, "Crecimiento", "growth", "%")
+        self.v_dd = self._entry_with_help(frm, 1, "DD", "dd")
+        self.v_dl = self._entry_with_help(frm, 2, "DL", "dl")
+        self.v_tf = self._entry_with_help(frm, 3, "TF manual", "tf", "ESAL/veh pesado")
+        self.v_growth = self._entry_with_help(frm, 4, "Crecimiento", "growth", "%")
 
-        ttk.Label(frm, text="Años de diseño").grid(row=6, column=0, sticky="w")
+        ttk.Label(frm, text="Años de diseño").grid(row=5, column=0, sticky="w")
         self.v_years = tk.StringVar()
-        ttk.Entry(frm, textvariable=self.v_years).grid(row=6, column=1, sticky="ew")
+        ttk.Entry(frm, textvariable=self.v_years).grid(row=5, column=1, sticky="ew")
 
         self.v_use_detailed = tk.BooleanVar()
-        ttk.Checkbutton(frm, text="Usar TF detallado por tipo de vehículo", variable=self.v_use_detailed).grid(row=7, column=0, columnspan=4, sticky="w")
+        ttk.Checkbutton(frm, text="Usar TF detallado por tipo de vehículo", variable=self.v_use_detailed).grid(row=6, column=0, columnspan=4, sticky="w")
 
         self.v_class_input_mode = tk.StringVar(value="share_pct")
-        ttk.Radiobutton(frm, text="Entrada por % participación", variable=self.v_class_input_mode, value="share_pct", command=self._update_traffic_mode_ui).grid(row=8, column=0, columnspan=2, sticky="w")
-        ttk.Radiobutton(frm, text="Entrada por tránsito (veh/día)", variable=self.v_class_input_mode, value="count", command=self._update_traffic_mode_ui).grid(row=8, column=2, columnspan=2, sticky="w")
+        ttk.Radiobutton(frm, text="Entrada por % participación", variable=self.v_class_input_mode, value="share_pct", command=self._update_traffic_mode_ui).grid(row=7, column=0, columnspan=2, sticky="w")
+        ttk.Radiobutton(frm, text="Entrada por tránsito (veh/día)", variable=self.v_class_input_mode, value="count", command=self._update_traffic_mode_ui).grid(row=7, column=2, columnspan=2, sticky="w")
 
         cls = ttk.LabelFrame(self.tab_traffic, text="Clasificación vehicular (activar/desactivar por tipo)", padding=10)
         cls.pack(fill="both", expand=True, pady=(10, 0))
@@ -308,7 +302,7 @@ class App:
 
     def _load_to_form(self):
         t = self.data["traffic"]; a = self.data["aashto"]; l = self.data["layers"]
-        self.v_aadt.set(str(t["aadt_total"])); self.v_pct_trucks.set(str(t["pct_trucks"])); self.v_dd.set(str(t["dd"])); self.v_dl.set(str(t["dl"]))
+        self.v_aadt.set(str(t["aadt_total"])); self.v_dd.set(str(t["dd"])); self.v_dl.set(str(t["dl"]))
         self.v_tf.set(str(t["truck_factor"])); self.v_growth.set(str(t["growth_pct"])); self.v_years.set(str(t["design_years"])); self.v_use_detailed.set(bool(t.get("use_detailed_tf", False))); self.v_class_input_mode.set(t.get("class_input_mode", "share_pct"))
         for idx, row in enumerate(t.get("truck_classes", [])):
             if idx < len(self.class_rows):
@@ -323,7 +317,7 @@ class App:
 
     def _read_form_to_data(self):
         t = self.data["traffic"]; a = self.data["aashto"]; l = self.data["layers"]
-        t["aadt_total"] = float(self.v_aadt.get()); t["pct_trucks"] = float(self.v_pct_trucks.get()); t["dd"] = float(self.v_dd.get()); t["dl"] = float(self.v_dl.get())
+        t["aadt_total"] = float(self.v_aadt.get()); t["pct_trucks"] = 100.0; t["dd"] = float(self.v_dd.get()); t["dl"] = float(self.v_dl.get())
         t["truck_factor"] = float(self.v_tf.get()); t["growth_pct"] = float(self.v_growth.get()); t["design_years"] = int(float(self.v_years.get())); t["use_detailed_tf"] = bool(self.v_use_detailed.get()); t["class_input_mode"] = self.v_class_input_mode.get()
         classes = []
         for en, n, s_v, c_v, e in self.class_rows:
@@ -360,9 +354,6 @@ class App:
         mode = self.v_class_input_mode.get()
         is_count = mode == "count"
         self.e_aadt.configure(state="readonly" if is_count else "normal")
-        self.e_pct.configure(state="readonly" if is_count else "normal")
-        if is_count:
-            self.v_pct_trucks.set("100")
         for e in self.share_entries:
             e.configure(state="disabled" if is_count else "normal")
         for e in self.count_entries:
@@ -373,7 +364,6 @@ class App:
         t = self.data["traffic"]; a = self.data["aashto"]; v = self.data["validation"]
         checks = [
             ("TPDA", t["aadt_total"], v["aadt_min"], v["aadt_max"], "Ajusta TPDA o cambia rango en Opciones."),
-            ("% pesados", t["pct_trucks"], v["pct_trucks_min"], v["pct_trucks_max"], "Verifica clasificación vehicular."),
             ("DD", t["dd"], v["dd_min"], v["dd_max"], "Revisa factor direccional."),
             ("DL", t["dl"], v["dl_min"], v["dl_max"], "Revisa factor de carril."),
             ("Crecimiento", t["growth_pct"], v["growth_min"], v["growth_max"], "Revisa tasa histórica."),
@@ -504,12 +494,11 @@ class App:
                 )
                 return w18, tf, breakdown
 
-            w18 = calc_w18(
-                aadt_total=t["aadt_total"],
-                pct_trucks=t["pct_trucks"] / 100.0,
+            daily_esal = t["aadt_total"] * tf
+            w18 = calc_w18_from_daily_esal(
+                daily_esal=daily_esal,
                 dd=t["dd"],
                 dl=t["dl"],
-                truck_factor=tf,
                 growth_pct=t["growth_pct"],
                 years=t["design_years"],
             )
@@ -597,6 +586,14 @@ class App:
 
             out = []
             out.append("RESULTADOS AASHTO 1993\n\n")
+            out.append("Metodología ESAL usada:\n")
+            if t.get("class_input_mode") == "count":
+                out.append("- ESAL diario = Σ(Tránsito_i * EALF_i).\n")
+                out.append("- W18 = 365 * ESAL_diario * DD * DL * factor_crecimiento.\n\n")
+            else:
+                out.append("- TF = Σ(%Participación_i * EALF_i).\n")
+                out.append("- ESAL diario = TPDA * TF.\n")
+                out.append("- W18 = 365 * ESAL_diario * DD * DL * factor_crecimiento.\n\n")
             out.append(f"W18 acumulado: {w18:,.0f}\n")
             out.append(f"SN3 objetivo (usuario): {fnum(sn3_target,3)}\n")
             out.append(f"SN3 estimado por AASHTO (referencia): {fnum(sn3_aashto,3)}\n")
@@ -721,7 +718,7 @@ class App:
 
             data_lines = [
                 f"Proyecto: {self.data.get('project', {}).get('name', 'N/A')}",
-                f"TPDA: {t['aadt_total']:.2f} | %Pesados: {t['pct_trucks']:.2f} | DD: {t['dd']:.3f} | DL: {t['dl']:.3f}",
+                f"TPDA: {t['aadt_total']:.2f} | DD: {t['dd']:.3f} | DL: {t['dl']:.3f}",
                 f"Crecimiento: {t['growth_pct']:.2f}% | Años: {t['design_years']} | TF usado: {rs['TF_used']:.3f}",
                 f"R: {a['reliability_pct']:.2f} | So: {a['so']:.3f} | Pi: {a['pi']:.3f} | Pt: {a['pt']:.3f} | Mr(MPa): {a['mr_mpa']:.3f}",
                 f"a1:{l['a1']:.3f} a2:{l['a2']:.3f} a3:{l['a3']:.3f} m2:{l['m2']:.3f} m3:{l['m3']:.3f}",

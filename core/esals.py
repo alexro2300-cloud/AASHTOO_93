@@ -95,8 +95,8 @@ def calc_truck_factor_detailed(vehicle_classes: list[dict], mode: str = "share_p
 
     if total_share <= 0:
         raise ValueError("La suma de participaciones vehiculares debe ser > 0")
-    if total_share > 100.001:
-        raise ValueError("La suma de participaciones vehiculares no puede superar 100%")
+    if not (99.5 <= total_share <= 100.5):
+        raise ValueError(f"La suma de participaciones vehiculares debe ser 100% (actual: {total_share:.2f}%)")
 
     return tf, {
         "mode": "share_pct",
