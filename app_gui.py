@@ -81,6 +81,7 @@ class App:
                 "a1": 0.44, "a2": 0.14, "a3": 0.11, "m2": 1.0, "m3": 1.0,
                 "sn1_target": 1.8,
                 "sn2_target": 3.2,
+                "sn3_target": 4.5,
             },
             "validation": {
                 "aadt_min": 100.0, "aadt_max": 200000.0,
@@ -198,7 +199,7 @@ class App:
         for c in range(8):
             frm.columnconfigure(c, weight=1 if c in (1, 5) else 0)
         self.v_a1 = tk.StringVar(); self.v_a2 = tk.StringVar(); self.v_a3 = tk.StringVar(); self.v_m2 = tk.StringVar(); self.v_m3 = tk.StringVar()
-        self.v_sn1 = tk.StringVar(); self.v_sn2 = tk.StringVar()
+        self.v_sn1 = tk.StringVar(); self.v_sn2 = tk.StringVar(); self.v_sn3 = tk.StringVar()
 
         def er(r, t, v, u=""):
             ttk.Label(frm, text=t).grid(row=r, column=0, sticky="w", pady=3)
@@ -212,8 +213,9 @@ class App:
         er(4, "m3", self.v_m3)
         er(5, "SN1 objetivo", self.v_sn1)
         er(6, "SN2 objetivo", self.v_sn2)
+        er(7, "SN3 objetivo", self.v_sn3)
 
-        ttk.Label(self.tab_layers, text="SN3 objetivo se toma del SN requerido AASHTO calculado automáticamente.", foreground="#444").pack(anchor="w", pady=(8, 0))
+        ttk.Label(self.tab_layers, text="SN1, SN2 y SN3 objetivo son ingresados por el usuario para el método secuencial.", foreground="#444").pack(anchor="w", pady=(8, 0))
 
     def _build_tab_results(self):
         self.txt = tk.Text(self.tab_results, height=30, wrap="word")
@@ -246,7 +248,7 @@ class App:
                 en, n, s_v, e, ap = self.class_rows[idx]
                 en.set(bool(row.get("enabled", True))); n.set(str(row.get("name", ""))); s_v.set(str(row.get("share_pct", ""))); e.set(str(row.get("ealf", ""))); ap.set(str(row.get("ap", 1.0)))
         self.v_rel.set(str(a["reliability_pct"])); self.v_so.set(str(a["so"])); self.v_pi.set(str(a["pi"])); self.v_pt.set(str(a["pt"])); self.v_mr.set(str(a["mr_mpa"]))
-        self.v_a1.set(str(l["a1"])); self.v_a2.set(str(l["a2"])); self.v_a3.set(str(l["a3"])); self.v_m2.set(str(l["m2"])); self.v_m3.set(str(l["m3"])); self.v_sn1.set(str(l["sn1_target"])); self.v_sn2.set(str(l["sn2_target"]))
+        self.v_a1.set(str(l["a1"])); self.v_a2.set(str(l["a2"])); self.v_a3.set(str(l["a3"])); self.v_m2.set(str(l["m2"])); self.v_m3.set(str(l["m3"])); self.v_sn1.set(str(l["sn1_target"])); self.v_sn2.set(str(l["sn2_target"])); self.v_sn3.set(str(l["sn3_target"]))
 
     def _read_form_to_data(self):
         t = self.data["traffic"]; a = self.data["aashto"]; l = self.data["layers"]
@@ -259,7 +261,7 @@ class App:
         t["truck_classes"] = classes
         a["reliability_pct"] = float(self.v_rel.get()); a["so"] = float(self.v_so.get()); a["pi"] = float(self.v_pi.get()); a["pt"] = float(self.v_pt.get()); a["mr_mpa"] = float(self.v_mr.get())
         l["a1"] = float(self.v_a1.get()); l["a2"] = float(self.v_a2.get()); l["a3"] = float(self.v_a3.get()); l["m2"] = float(self.v_m2.get()); l["m3"] = float(self.v_m3.get())
-        l["sn1_target"] = float(self.v_sn1.get()); l["sn2_target"] = float(self.v_sn2.get())
+        l["sn1_target"] = float(self.v_sn1.get()); l["sn2_target"] = float(self.v_sn2.get()); l["sn3_target"] = float(self.v_sn3.get())
         self._validate_ranges()
 
     def _validate_ranges(self):
@@ -354,20 +356,22 @@ class App:
             tf, tf_breakdown = self._compute_tf()
 
             w18 = calc_w18(aadt_total=t["aadt_total"], pct_trucks=t["pct_trucks"] / 100.0, dd=t["dd"], dl=t["dl"], truck_factor=tf, growth_pct=t["growth_pct"], years=t["design_years"])
-            sn3, zr = solve_sn_required(w18=w18, reliability_pct=a["reliability_pct"], so=a["so"], pi=a["pi"], pt=a["pt"], mr_mpa=a["mr_mpa"])
+            sn3_aashto, zr = solve_sn_required(w18=w18, reliability_pct=a["reliability_pct"], so=a["so"], pi=a["pi"], pt=a["pt"], mr_mpa=a["mr_mpa"])
+            sn3_target = l["sn3_target"]
 
             calc = design_thicknesses_sequential(
-                sn1_target=l["sn1_target"], sn2_target=l["sn2_target"], sn3_target=sn3,
+                sn1_target=l["sn1_target"], sn2_target=l["sn2_target"], sn3_target=sn3_target,
                 a1=l["a1"], a2=l["a2"], a3=l["a3"], m2=l["m2"], m3=l["m3"],
             )
-            mins = apply_minimums_sequential(calc, w18, l["a1"], l["a2"], l["a3"], l["m2"], l["m3"], sn3)
+            mins = apply_minimums_sequential(calc, w18, l["a1"], l["a2"], l["a3"], l["m2"], l["m3"], sn3_target)
 
-            self.data["results"] = {"W18": w18, "SN_required": sn3, "Zr": zr, "TF_used": tf, "TF_breakdown": tf_breakdown, "calculated": calc, "with_minimums": mins}
+            self.data["results"] = {"W18": w18, "SN3_target": sn3_target, "SN3_aashto": sn3_aashto, "Zr": zr, "TF_used": tf, "TF_breakdown": tf_breakdown, "calculated": calc, "with_minimums": mins}
 
             out = []
             out.append("RESULTADOS AASHTO 1993\n\n")
             out.append(f"W18 acumulado: {w18:,.0f}\n")
-            out.append(f"SN3 (requerido): {fnum(sn3,3)}\n")
+            out.append(f"SN3 objetivo (usuario): {fnum(sn3_target,3)}\n")
+            out.append(f"SN3 estimado por AASHTO (referencia): {fnum(sn3_aashto,3)}\n")
             out.append(f"SN1 objetivo: {fnum(l['sn1_target'],3)} | SN2 objetivo: {fnum(l['sn2_target'],3)}\n\n")
             out.append("1) Espesores calculados (SIN mínimos)\n")
             out.append(f"- D1: {fnum(calc['D1_in'],2)} in | {fnum(calc['D1_cm'],2)} cm\n")
@@ -382,7 +386,7 @@ class App:
             out.append(f"SN corregidos sumados: {fnum(mins['SN_sum'],3)}\n")
             out.append("Observación: " + ("Mínimos SÍ modificaron la solución." if mins["minimums_govern"] else "Mínimos NO modificaron la solución.") + "\n")
 
-            calc_txt = self._build_calculos_text(calc, mins, l, sn3)
+            calc_txt = self._build_calculos_text(calc, mins, l, sn3_target)
             self._write_text(self.txt, "".join(out))
             self._write_text(self.txt_calc, calc_txt)
             self._draw_sections(calc, mins)
@@ -456,7 +460,8 @@ class App:
             c.setFont("Helvetica", 10)
             for ln in [
                 f"W18: {rs['W18']:,.0f}",
-                f"SN3 requerido: {rs['SN_required']:.3f}",
+                f"SN3 objetivo (usuario): {rs['SN3_target']:.3f}",
+                f"SN3 estimado AASHTO (referencia): {rs['SN3_aashto']:.3f}",
                 f"D calculados (in): {rs['calculated']['D1_in']:.2f}, {rs['calculated']['D2_in']:.2f}, {rs['calculated']['D3_in']:.2f}",
                 f"D con mínimos (in): {rs['with_minimums']['D1_in']:.2f}, {rs['with_minimums']['D2_in']:.2f}, {rs['with_minimums']['D3_in']:.2f}",
             ]:
