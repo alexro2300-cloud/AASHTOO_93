@@ -94,6 +94,7 @@ class App:
                 "r_min": 50.0, "r_max": 99.9,
             },
             "minimums_table": {k: v.copy() for k, v in DEFAULT_MINIMUMS_TABLE_IN.items()},
+            "prelim_costs": {"width_m": 12.0, "cost_d1": 3200.0, "cost_d2": 900.0, "cost_d3": 700.0},
             "results": {},
         }
 
@@ -120,6 +121,7 @@ class App:
         self.tab_layers = ttk.Frame(self.nb, padding=12)
         self.tab_results = ttk.Frame(self.nb, padding=12)
         self.tab_calculos = ttk.Frame(self.nb, padding=12)
+        self.tab_costs = ttk.Frame(self.nb, padding=12)
         self.tab_section = ttk.Frame(self.nb, padding=12)
 
         self.nb.add(self.tab_traffic, text="Tránsito / ESALs")
@@ -127,6 +129,7 @@ class App:
         self.nb.add(self.tab_layers, text="Capas / Espesores")
         self.nb.add(self.tab_results, text="Resultados")
         self.nb.add(self.tab_calculos, text="Cálculos")
+        self.nb.add(self.tab_costs, text="Costos preliminares")
         self.nb.add(self.tab_section, text="Sección de Pavimento")
 
         self._build_tab_traffic()
@@ -134,6 +137,7 @@ class App:
         self._build_tab_layers()
         self._build_tab_results()
         self._build_tab_calculos()
+        self._build_tab_costs()
         self._build_tab_section()
         self._load_to_form()
 
@@ -152,6 +156,8 @@ class App:
             frm.columnconfigure(c, weight=1 if c in (1, 5) else 0)
         self.v_aadt = self._entry_with_help(frm, 0, "TPDA total", "aadt", "veh/día")
         self.v_pct_trucks = self._entry_with_help(frm, 1, "% pesados", "pct_trucks", "%")
+        self.e_aadt = frm.grid_slaves(row=0, column=1)[0]
+        self.e_pct = frm.grid_slaves(row=1, column=1)[0]
         self.v_dd = self._entry_with_help(frm, 2, "DD", "dd")
         self.v_dl = self._entry_with_help(frm, 3, "DL", "dl")
         self.v_tf = self._entry_with_help(frm, 4, "TF manual", "tf", "ESAL/veh pesado")
@@ -165,8 +171,8 @@ class App:
         ttk.Checkbutton(frm, text="Usar TF detallado por tipo de vehículo", variable=self.v_use_detailed).grid(row=7, column=0, columnspan=4, sticky="w")
 
         self.v_class_input_mode = tk.StringVar(value="share_pct")
-        ttk.Radiobutton(frm, text="Entrada por % participación", variable=self.v_class_input_mode, value="share_pct").grid(row=8, column=0, columnspan=2, sticky="w")
-        ttk.Radiobutton(frm, text="Entrada por tránsito (veh/día)", variable=self.v_class_input_mode, value="count").grid(row=8, column=2, columnspan=2, sticky="w")
+        ttk.Radiobutton(frm, text="Entrada por % participación", variable=self.v_class_input_mode, value="share_pct", command=self._update_traffic_mode_ui).grid(row=8, column=0, columnspan=2, sticky="w")
+        ttk.Radiobutton(frm, text="Entrada por tránsito (veh/día)", variable=self.v_class_input_mode, value="count", command=self._update_traffic_mode_ui).grid(row=8, column=2, columnspan=2, sticky="w")
 
         cls = ttk.LabelFrame(self.tab_traffic, text="Clasificación vehicular (activar/desactivar por tipo)", padding=10)
         cls.pack(fill="both", expand=True, pady=(10, 0))
@@ -175,6 +181,8 @@ class App:
             ttk.Label(cls, text=h).grid(row=0, column=i, sticky="w")
 
         self.class_rows = []
+        self.share_entries = []
+        self.count_entries = []
         for i in range(11):
             en = tk.BooleanVar(value=True)
             name_v = tk.StringVar()
@@ -184,11 +192,17 @@ class App:
             ap_v = tk.StringVar(value="1.0")
             ttk.Checkbutton(cls, variable=en).grid(row=i + 1, column=0, sticky="w")
             ttk.Entry(cls, textvariable=name_v, width=12).grid(row=i + 1, column=1, sticky="ew", padx=2, pady=2)
-            ttk.Entry(cls, textvariable=share_v, width=10).grid(row=i + 1, column=2, sticky="ew", padx=2, pady=2)
-            ttk.Entry(cls, textvariable=count_v, width=12).grid(row=i + 1, column=3, sticky="ew", padx=2, pady=2)
+            e_share = ttk.Entry(cls, textvariable=share_v, width=10)
+            e_share.grid(row=i + 1, column=2, sticky="ew", padx=2, pady=2)
+            e_count = ttk.Entry(cls, textvariable=count_v, width=12)
+            e_count.grid(row=i + 1, column=3, sticky="ew", padx=2, pady=2)
             ttk.Entry(cls, textvariable=ealf_v, width=10).grid(row=i + 1, column=4, sticky="ew", padx=2, pady=2)
             ttk.Entry(cls, textvariable=ap_v, width=8).grid(row=i + 1, column=5, sticky="ew", padx=2, pady=2)
             self.class_rows.append((en, name_v, share_v, count_v, ealf_v, ap_v))
+            self.share_entries.append(e_share)
+            self.count_entries.append(e_count)
+            count_v.trace_add("write", self._auto_update_aadt_from_counts)
+            en.trace_add("write", self._auto_update_aadt_from_counts)
 
     def _build_tab_aashto(self):
         frm = ttk.LabelFrame(self.tab_aashto, text="Parámetros de diseño", padding=12)
@@ -235,6 +249,32 @@ class App:
         self.txt_calc.pack(fill="both", expand=True)
         self.txt_calc.configure(state="disabled")
 
+
+    def _build_tab_costs(self):
+        frm = ttk.LabelFrame(self.tab_costs, text="Parámetros de costo por m³", padding=12)
+        frm.pack(fill="x")
+        for c in range(4):
+            frm.columnconfigure(c, weight=1 if c == 1 else 0)
+
+        self.v_width = tk.StringVar()
+        self.v_cost_d1 = tk.StringVar()
+        self.v_cost_d2 = tk.StringVar()
+        self.v_cost_d3 = tk.StringVar()
+
+        def row(r, lbl, var, unit):
+            ttk.Label(frm, text=lbl).grid(row=r, column=0, sticky="w", pady=3)
+            ttk.Entry(frm, textvariable=var).grid(row=r, column=1, sticky="ew", pady=3)
+            ttk.Label(frm, text=unit).grid(row=r, column=2, sticky="w")
+
+        row(0, "Ancho de corona", self.v_width, "m")
+        row(1, "Costo carpeta", self.v_cost_d1, "$/m³")
+        row(2, "Costo base", self.v_cost_d2, "$/m³")
+        row(3, "Costo subbase", self.v_cost_d3, "$/m³")
+
+        self.txt_cost = tk.Text(self.tab_costs, height=16, wrap="word")
+        self.txt_cost.pack(fill="both", expand=True, pady=(10, 0))
+        self.txt_cost.configure(state="disabled")
+
     def _build_tab_section(self):
         holder = ttk.Frame(self.tab_section)
         holder.pack(fill="both", expand=True)
@@ -257,6 +297,10 @@ class App:
                 en.set(bool(row.get("enabled", True))); n.set(str(row.get("name", ""))); s_v.set(str(row.get("share_pct", ""))); c_v.set(str(row.get("count", ""))); e.set(str(row.get("ealf", ""))); ap.set(str(row.get("ap", 1.0)))
         self.v_rel.set(str(a["reliability_pct"])); self.v_so.set(str(a["so"])); self.v_pi.set(str(a["pi"])); self.v_pt.set(str(a["pt"])); self.v_mr.set(str(a["mr_mpa"]))
         self.v_a1.set(str(l["a1"])); self.v_a2.set(str(l["a2"])); self.v_a3.set(str(l["a3"])); self.v_m2.set(str(l["m2"])); self.v_m3.set(str(l["m3"])); self.v_sn1.set(str(l["sn1_target"])); self.v_sn2.set(str(l["sn2_target"])); self.v_sn3.set(str(l["sn3_target"]))
+        c = self.data["prelim_costs"]
+        self.v_width.set(str(c.get("width_m", 12.0))); self.v_cost_d1.set(str(c.get("cost_d1", 0.0))); self.v_cost_d2.set(str(c.get("cost_d2", 0.0))); self.v_cost_d3.set(str(c.get("cost_d3", 0.0))
+)
+        self._update_traffic_mode_ui()
 
     def _read_form_to_data(self):
         t = self.data["traffic"]; a = self.data["aashto"]; l = self.data["layers"]
@@ -267,10 +311,44 @@ class App:
             if n.get().strip() or s_v.get().strip() or c_v.get().strip() or e.get().strip():
                 classes.append({"enabled": bool(en.get()), "name": n.get().strip() or "Clase", "share_pct": float(s_v.get() or 0), "count": float(c_v.get() or 0), "ealf": float(e.get() or 0), "ap": float(ap.get() or 1)})
         t["truck_classes"] = classes
+        if t.get("class_input_mode") == "count":
+            t["aadt_total"] = sum(r["count"] for r in classes if r["enabled"])
+            self.v_aadt.set(str(t["aadt_total"]))
         a["reliability_pct"] = float(self.v_rel.get()); a["so"] = float(self.v_so.get()); a["pi"] = float(self.v_pi.get()); a["pt"] = float(self.v_pt.get()); a["mr_mpa"] = float(self.v_mr.get())
         l["a1"] = float(self.v_a1.get()); l["a2"] = float(self.v_a2.get()); l["a3"] = float(self.v_a3.get()); l["m2"] = float(self.v_m2.get()); l["m3"] = float(self.v_m3.get())
         l["sn1_target"] = float(self.v_sn1.get()); l["sn2_target"] = float(self.v_sn2.get()); l["sn3_target"] = float(self.v_sn3.get())
+        c = self.data["prelim_costs"]
+        c["width_m"] = float(self.v_width.get()); c["cost_d1"] = float(self.v_cost_d1.get()); c["cost_d2"] = float(self.v_cost_d2.get()); c["cost_d3"] = float(self.v_cost_d3.get())
         self._validate_ranges()
+
+
+    def _auto_update_aadt_from_counts(self, *_):
+        if getattr(self, "v_class_input_mode", None) is None:
+            return
+        if self.v_class_input_mode.get() != "count":
+            return
+        total = 0.0
+        for en, _, _, c_v, _, _ in self.class_rows:
+            if not en.get():
+                continue
+            try:
+                total += float(c_v.get() or 0)
+            except Exception:
+                pass
+        self.v_aadt.set(f"{total:.2f}")
+
+    def _update_traffic_mode_ui(self):
+        mode = self.v_class_input_mode.get()
+        is_count = mode == "count"
+        self.e_aadt.configure(state="readonly" if is_count else "normal")
+        self.e_pct.configure(state="readonly" if is_count else "normal")
+        if is_count:
+            self.v_pct_trucks.set("100")
+        for e in self.share_entries:
+            e.configure(state="disabled" if is_count else "normal")
+        for e in self.count_entries:
+            e.configure(state="normal" if is_count else "disabled")
+        self._auto_update_aadt_from_counts()
 
     def _validate_ranges(self):
         t = self.data["traffic"]; a = self.data["aashto"]; v = self.data["validation"]
@@ -443,7 +521,24 @@ class App:
             )
             mins = apply_minimums_sequential(calc, w18, l["a1"], l["a2"], l["a3"], l["m2"], l["m3"], sn3_target, self.data.get("minimums_table"))
 
-            self.data["results"] = {"W18": w18, "SN3_target": sn3_target, "SN3_aashto": sn3_aashto, "Zr": zr, "TF_used": tf, "TF_breakdown": tf_breakdown, "calculated": calc, "with_minimums": mins}
+            cst = self.data["prelim_costs"]
+            width = cst["width_m"]
+            v1 = (calc["D1_in"] * 0.0254) * width * 1000
+            v2 = (calc["D2_in"] * 0.0254) * width * 1000
+            v3 = (calc["D3_in"] * 0.0254) * width * 1000
+            calc_cost = v1*cst["cost_d1"] + v2*cst["cost_d2"] + v3*cst["cost_d3"]
+            m1 = (mins["D1_in"] * 0.0254) * width * 1000
+            m2 = (mins["D2_in"] * 0.0254) * width * 1000
+            m3 = (mins["D3_in"] * 0.0254) * width * 1000
+            min_cost = m1*cst["cost_d1"] + m2*cst["cost_d2"] + m3*cst["cost_d3"]
+
+            costs = {
+                "width_m": width,
+                "calculated": {"vol_d1": v1, "vol_d2": v2, "vol_d3": v3, "total": calc_cost},
+                "minimums": {"vol_d1": m1, "vol_d2": m2, "vol_d3": m3, "total": min_cost},
+            }
+
+            self.data["results"] = {"W18": w18, "SN3_target": sn3_target, "SN3_aashto": sn3_aashto, "Zr": zr, "TF_used": tf, "TF_breakdown": tf_breakdown, "calculated": calc, "with_minimums": mins, "costs": costs}
 
             out = []
             out.append("RESULTADOS AASHTO 1993\n\n")
@@ -468,6 +563,7 @@ class App:
             self._write_text(self.txt, "".join(out))
             self._write_text(self.txt_calc, calc_txt)
             self._draw_sections(calc, mins)
+            self._write_text(self.txt_cost, self._build_costs_text(costs))
             self.nb.select(self.tab_results)
 
         except Exception as e:
@@ -500,6 +596,27 @@ class App:
         lines.append(f"D3 redondeado (0.5 hacia arriba) = {mins['D3_in']:.2f} in\n")
         lines.append(f"SN3*min = {mins['SN3_star']:.3f}\n")
         lines.append(f"Comprobación suma mínima: {mins['SN_sum']:.3f}\n")
+        return "".join(lines)
+
+
+    def _build_costs_text(self, costs: dict) -> str:
+        c = self.data["prelim_costs"]
+        lines = []
+        lines.append("COSTOS PRELIMINARES POR KILÓMETRO\n\n")
+        lines.append(f"Ancho de corona: {costs['width_m']:.2f} m\n")
+        lines.append(f"Costo carpeta: {c['cost_d1']:.2f} $/m³ | base: {c['cost_d2']:.2f} $/m³ | subbase: {c['cost_d3']:.2f} $/m³\n\n")
+
+        lines.append("1) Solución calculada\n")
+        lines.append(f"- Vol carpeta: {costs['calculated']['vol_d1']:.2f} m³/km\n")
+        lines.append(f"- Vol base: {costs['calculated']['vol_d2']:.2f} m³/km\n")
+        lines.append(f"- Vol subbase: {costs['calculated']['vol_d3']:.2f} m³/km\n")
+        lines.append(f"- Costo total: {costs['calculated']['total']:.2f} $/km\n\n")
+
+        lines.append("2) Solución con mínimos\n")
+        lines.append(f"- Vol carpeta: {costs['minimums']['vol_d1']:.2f} m³/km\n")
+        lines.append(f"- Vol base: {costs['minimums']['vol_d2']:.2f} m³/km\n")
+        lines.append(f"- Vol subbase: {costs['minimums']['vol_d3']:.2f} m³/km\n")
+        lines.append(f"- Costo total: {costs['minimums']['total']:.2f} $/km\n")
         return "".join(lines)
 
     def _draw_one_section(self, canvas, d1, d2, d3):
@@ -536,6 +653,7 @@ class App:
             l = self.data["layers"]
             calc = rs["calculated"]
             mins = rs["with_minimums"]
+            costs = rs.get("costs", {})
 
             c = canvas.Canvas(path, pagesize=letter)
             page_w, page_h = letter
@@ -554,6 +672,8 @@ class App:
                 f"a1:{l['a1']:.3f} a2:{l['a2']:.3f} a3:{l['a3']:.3f} m2:{l['m2']:.3f} m3:{l['m3']:.3f}",
                 f"SN1:{l['sn1_target']:.3f} SN2:{l['sn2_target']:.3f} SN3_obj:{l['sn3_target']:.3f} SN3_ref:{rs['SN3_aashto']:.3f}",
                 f"W18: {rs['W18']:,.0f}",
+                f"Costo calculada: {costs.get('calculated', {}).get('total', 0.0):.2f} $/km",
+                f"Costo mínimos: {costs.get('minimums', {}).get('total', 0.0):.2f} $/km",
             ]
             for ln in data_lines:
                 c.drawString(36, y, ln)
