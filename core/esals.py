@@ -29,7 +29,7 @@ def calc_truck_factor_detailed(vehicle_classes: list[dict]) -> tuple[float, dict
     """
     Calcula TF ponderado por clases vehiculares.
 
-    vehicle_classes: [{"name": str, "share_pct": float, "ealf": float}, ...]
+    vehicle_classes: [{"name": str, "share_pct": float, "ealf": float, "ap": float, "enabled": bool}, ...]
     Retorna (tf, desglose)
     """
     if not vehicle_classes:
@@ -39,23 +39,35 @@ def calc_truck_factor_detailed(vehicle_classes: list[dict]) -> tuple[float, dict
     tf = 0.0
     breakdown = {}
 
+    enabled_count = 0
+
     for row in vehicle_classes:
+        enabled = bool(row.get("enabled", True))
+        if not enabled:
+            continue
+        enabled_count += 1
+
         name = row.get("name", "Clase")
         share_pct = float(row.get("share_pct", 0.0))
         ealf = float(row.get("ealf", 0.0))
+        ap = float(row.get("ap", 1.0))
 
-        if share_pct < 0 or ealf < 0:
-            raise ValueError("Participación y EALF por clase deben ser >= 0")
+        if share_pct < 0 or ealf < 0 or ap < 0:
+            raise ValueError("Participación, EALF y Ap por clase deben ser >= 0")
 
         share = share_pct / 100.0
-        contrib = share * ealf
+        contrib = share * ealf * ap
         total_share += share_pct
         tf += contrib
         breakdown[name] = {
             "share_pct": share_pct,
             "ealf": ealf,
+            "ap": ap,
             "contribution": contrib,
         }
+
+    if enabled_count == 0:
+        raise ValueError("Debes habilitar al menos una clase vehicular")
 
     if total_share <= 0:
         raise ValueError("La suma de participaciones vehiculares debe ser > 0")

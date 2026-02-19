@@ -20,31 +20,50 @@ def cm_pair(inches: float):
 
 
 HELP_TEXTS = {
-    "aadt": "TPDA total (veh/día). Usar conteos representativos de la vía.",
-    "pct_trucks": "% de pesados sobre total. Si hay clasificación, usar promedio anual.",
-    "dd": "Factor direccional (DD). Típico entre 0.5 y 0.6 para carreteras bidireccionales.",
-    "dl": "Factor carril de diseño (DL). En un carril por sentido suele acercarse a 1.0.",
-    "tf": "Truck Factor (ESAL/veh pesado). Puede obtenerse por espectro de ejes.",
-    "growth": "Tasa de crecimiento anual del tránsito pesado.",
-    "rel": "Confiabilidad de diseño R (%). A mayor R, mayor exigencia estructural.",
-    "so": "Desviación estándar global (So). Típicamente 0.35 a 0.50 en flexible.",
-    "pi": "Serviciabilidad inicial Pi. Valor típico 4.2.",
-    "pt": "Serviciabilidad terminal Pt. Valor típico 2.0 a 2.5.",
-    "mr": "Módulo resiliente de subrasante (Mr), en MPa.",
-    "a1": "Coeficiente estructural de mezcla asfáltica.",
-    "a2": "Coeficiente estructural de base granular.",
-    "a3": "Coeficiente estructural de subbase.",
-    "m2": "Coeficiente de drenaje de base.",
-    "m3": "Coeficiente de drenaje de subbase.",
+    "aadt": "TPDA (AADT): Tránsito Promedio Diario Anual total de vehículos.",
+    "pct_trucks": "% Pesados: proporción de vehículos pesados respecto al TPDA total.",
+    "dd": "DD (factor direccional): fracción del tránsito que circula en la dirección de diseño.",
+    "dl": "DL (factor de carril): fracción del tránsito direccional que usa el carril de diseño.",
+    "tf": "TF manual: ESAL por vehículo pesado promedio.",
+    "ap": "Ap (factor de presencia/participación de clase): ajuste adicional por clase (si no aplica, usar 1.0).",
+    "growth": "Crecimiento anual del tránsito pesado en porcentaje.",
+    "rel": "R (%): confiabilidad del diseño AASHTO.",
+    "so": "So: desviación estándar global del modelo AASHTO.",
+    "pi": "Pi: serviciabilidad inicial.",
+    "pt": "Pt: serviciabilidad terminal.",
+    "mr": "Mr: módulo resiliente de subrasante en MPa.",
+    "a1": "a1: coeficiente estructural de carpeta asfáltica.",
+    "a2": "a2: coeficiente estructural de base.",
+    "a3": "a3: coeficiente estructural de subbase.",
+    "m2": "m2: coeficiente de drenaje de base.",
+    "m3": "m3: coeficiente de drenaje de subbase.",
 }
+
+
+VALIDATION_FIELDS = [
+    ("aadt_min", "TPDA mínimo", "Límite inferior aceptado para TPDA total."),
+    ("aadt_max", "TPDA máximo", "Límite superior aceptado para TPDA total."),
+    ("pct_trucks_min", "% pesados mínimo", "Límite inferior del porcentaje de pesados."),
+    ("pct_trucks_max", "% pesados máximo", "Límite superior del porcentaje de pesados."),
+    ("dd_min", "DD mínimo", "Límite inferior del factor direccional DD."),
+    ("dd_max", "DD máximo", "Límite superior del factor direccional DD."),
+    ("dl_min", "DL mínimo", "Límite inferior del factor de carril DL."),
+    ("dl_max", "DL máximo", "Límite superior del factor de carril DL."),
+    ("growth_min", "Crecimiento mínimo (%)", "Límite inferior de crecimiento anual."),
+    ("growth_max", "Crecimiento máximo (%)", "Límite superior de crecimiento anual."),
+    ("mr_min", "Mr mínimo (MPa)", "Límite inferior para Mr."),
+    ("mr_max", "Mr máximo (MPa)", "Límite superior para Mr."),
+    ("r_min", "R mínima (%)", "Límite inferior de confiabilidad."),
+    ("r_max", "R máxima (%)", "Límite superior de confiabilidad."),
+]
 
 
 class App:
     def __init__(self):
         self.root = tk.Tk()
         self.root.title("AASHTO 1993 Flexible - Diseñador de Pavimentos")
-        self.root.geometry("1160x760")
-        self.root.minsize(1020, 680)
+        self.root.geometry("1220x800")
+        self.root.minsize(1080, 700)
 
         self.data = self.default_data()
         self._build_ui()
@@ -60,11 +79,19 @@ class App:
                 "truck_factor": 1.00,
                 "growth_pct": 3.0,
                 "design_years": 20,
-                "use_detailed_tf": False,
+                "use_detailed_tf": True,
                 "truck_classes": [
-                    {"name": "Liviano pesado", "share_pct": 35.0, "ealf": 0.35},
-                    {"name": "Camión 2 ejes", "share_pct": 40.0, "ealf": 0.75},
-                    {"name": "Tracto/carga", "share_pct": 25.0, "ealf": 1.50},
+                    {"name": "C2", "share_pct": 10.0, "ealf": 0.30, "ap": 1.0, "enabled": True},
+                    {"name": "C3", "share_pct": 10.0, "ealf": 0.50, "ap": 1.0, "enabled": True},
+                    {"name": "C2-R2", "share_pct": 10.0, "ealf": 0.80, "ap": 1.0, "enabled": True},
+                    {"name": "C3-R2", "share_pct": 10.0, "ealf": 1.00, "ap": 1.0, "enabled": True},
+                    {"name": "C2-R3", "share_pct": 10.0, "ealf": 1.10, "ap": 1.0, "enabled": True},
+                    {"name": "C3-R3", "share_pct": 10.0, "ealf": 1.30, "ap": 1.0, "enabled": True},
+                    {"name": "T2-S1", "share_pct": 10.0, "ealf": 1.40, "ap": 1.0, "enabled": True},
+                    {"name": "T2-S2", "share_pct": 10.0, "ealf": 1.60, "ap": 1.0, "enabled": True},
+                    {"name": "T2-S3", "share_pct": 10.0, "ealf": 1.90, "ap": 1.0, "enabled": True},
+                    {"name": "T3-S2", "share_pct": 5.0, "ealf": 2.10, "ap": 1.0, "enabled": True},
+                    {"name": "T3-S3", "share_pct": 5.0, "ealf": 2.40, "ap": 1.0, "enabled": True},
                 ],
             },
             "aashto": {"reliability_pct": 95.0, "so": 0.49, "pi": 4.2, "pt": 2.5, "mr_mpa": 70.0},
@@ -108,12 +135,11 @@ class App:
 
         btns = ttk.Frame(top)
         btns.pack(side="right")
-        ttk.Button(btns, text="Nuevo", command=self.on_new).pack(side="left", padx=4)
-        ttk.Button(btns, text="Abrir", command=self.on_open).pack(side="left", padx=4)
-        ttk.Button(btns, text="Guardar", command=self.on_save).pack(side="left", padx=4)
-        ttk.Button(btns, text="Opciones", command=self.on_options).pack(side="left", padx=4)
-        ttk.Button(btns, text="Calcular", command=self.on_calculate).pack(side="left", padx=4)
-        ttk.Button(btns, text="PDF", command=self.on_export_pdf).pack(side="left", padx=4)
+        for txt, cmd in [
+            ("Nuevo", self.on_new), ("Abrir", self.on_open), ("Guardar", self.on_save),
+            ("Opciones", self.on_options), ("Calcular", self.on_calculate), ("PDF", self.on_export_pdf)
+        ]:
+            ttk.Button(btns, text=txt, command=cmd).pack(side="left", padx=4)
 
         self.nb = ttk.Notebook(self.root)
         self.nb.pack(fill="both", expand=True, padx=10, pady=8)
@@ -135,13 +161,13 @@ class App:
         self._build_tab_layers()
         self._build_tab_results()
         self._build_tab_section()
+
         self._load_to_form()
 
     def _entry_with_help(self, parent, row, label, key, unit="", col=0):
-        ttk.Label(parent, text=label).grid(row=row, column=col, sticky="w", pady=4, padx=(0, 6))
+        ttk.Label(parent, text=label).grid(row=row, column=col, sticky="w", pady=3, padx=(0, 6))
         v = tk.StringVar()
-        e = ttk.Entry(parent, textvariable=v)
-        e.grid(row=row, column=col + 1, sticky="ew", pady=4)
+        ttk.Entry(parent, textvariable=v).grid(row=row, column=col + 1, sticky="ew", pady=3)
         ttk.Label(parent, text=unit).grid(row=row, column=col + 2, sticky="w", padx=(6, 2))
         ttk.Button(parent, text="?", width=3, command=lambda k=key: self.show_help(k)).grid(row=row, column=col + 3, padx=(2, 0))
         return v
@@ -152,58 +178,69 @@ class App:
         for c in range(8):
             frm.columnconfigure(c, weight=1 if c in (1, 5) else 0)
 
-        self.v_aadt = self._entry_with_help(frm, 0, "TPDA total", "aadt", "veh/día", col=0)
-        self.v_pct_trucks = self._entry_with_help(frm, 1, "% pesados", "pct_trucks", "%", col=0)
-        self.v_dd = self._entry_with_help(frm, 2, "DD", "dd", "-", col=0)
-        self.v_dl = self._entry_with_help(frm, 3, "DL", "dl", "-", col=0)
-        self.v_tf = self._entry_with_help(frm, 4, "Truck Factor", "tf", "ESAL/veh", col=0)
-        self.v_growth = self._entry_with_help(frm, 5, "Crecimiento", "growth", "%", col=0)
+        self.v_aadt = self._entry_with_help(frm, 0, "TPDA total", "aadt", "veh/día")
+        self.v_pct_trucks = self._entry_with_help(frm, 1, "% pesados", "pct_trucks", "%")
+        self.v_dd = self._entry_with_help(frm, 2, "DD", "dd", "-")
+        self.v_dl = self._entry_with_help(frm, 3, "DL", "dl", "-")
+        self.v_tf = self._entry_with_help(frm, 4, "TF manual", "tf", "ESAL/veh pesado")
+        self.v_growth = self._entry_with_help(frm, 5, "Crecimiento", "growth", "%")
 
-        ttk.Label(frm, text="Años de diseño").grid(row=6, column=0, sticky="w", pady=4)
+        ttk.Label(frm, text="Años de diseño").grid(row=6, column=0, sticky="w")
         self.v_years = tk.StringVar()
-        ttk.Entry(frm, textvariable=self.v_years).grid(row=6, column=1, sticky="ew", pady=4)
+        ttk.Entry(frm, textvariable=self.v_years).grid(row=6, column=1, sticky="ew")
 
         self.v_use_detailed = tk.BooleanVar()
-        ttk.Checkbutton(frm, text="Calcular TF detallado por clases", variable=self.v_use_detailed).grid(row=7, column=0, columnspan=4, sticky="w", pady=(8, 4))
+        ttk.Checkbutton(frm, text="Usar TF detallado por tipo de vehículo", variable=self.v_use_detailed).grid(row=7, column=0, columnspan=4, sticky="w", pady=(8, 4))
 
-        cls = ttk.LabelFrame(self.tab_traffic, text="Clases vehiculares (para TF detallado)", padding=10)
-        cls.pack(fill="x", pady=(10, 0))
-        for c in range(4):
-            cls.columnconfigure(c, weight=1)
-        ttk.Label(cls, text="Clase").grid(row=0, column=0, sticky="w")
-        ttk.Label(cls, text="Participación (%)").grid(row=0, column=1, sticky="w")
-        ttk.Label(cls, text="EALF").grid(row=0, column=2, sticky="w")
+        tip = ttk.Label(
+            self.tab_traffic,
+            text="Ap = factor de ajuste por clase. Si no deseas ajuste adicional, usa Ap=1.0.",
+            foreground="#444"
+        )
+        tip.pack(anchor="w", pady=(6, 0))
+
+        cls = ttk.LabelFrame(self.tab_traffic, text="Clasificación vehicular (activa/desactiva con checkbox)", padding=10)
+        cls.pack(fill="both", expand=True, pady=(10, 0))
+        headers = ["Usar", "Nomenclatura", "Participación %", "EALF", "Ap", "?"]
+        for i, h in enumerate(headers):
+            ttk.Label(cls, text=h).grid(row=0, column=i, sticky="w")
+
         self.class_rows = []
-        for i in range(3):
+        for i in range(11):
+            en = tk.BooleanVar(value=True)
             name_v = tk.StringVar()
             share_v = tk.StringVar()
             ealf_v = tk.StringVar()
-            ttk.Entry(cls, textvariable=name_v).grid(row=i + 1, column=0, sticky="ew", padx=2, pady=2)
-            ttk.Entry(cls, textvariable=share_v).grid(row=i + 1, column=1, sticky="ew", padx=2, pady=2)
-            ttk.Entry(cls, textvariable=ealf_v).grid(row=i + 1, column=2, sticky="ew", padx=2, pady=2)
-            self.class_rows.append((name_v, share_v, ealf_v))
+            ap_v = tk.StringVar(value="1.0")
+            ttk.Checkbutton(cls, variable=en).grid(row=i + 1, column=0, sticky="w")
+            ttk.Entry(cls, textvariable=name_v, width=12).grid(row=i + 1, column=1, sticky="ew", padx=2, pady=2)
+            ttk.Entry(cls, textvariable=share_v, width=10).grid(row=i + 1, column=2, sticky="ew", padx=2, pady=2)
+            ttk.Entry(cls, textvariable=ealf_v, width=10).grid(row=i + 1, column=3, sticky="ew", padx=2, pady=2)
+            ttk.Entry(cls, textvariable=ap_v, width=8).grid(row=i + 1, column=4, sticky="ew", padx=2, pady=2)
+            ttk.Button(cls, text="?", width=3, command=lambda: self.show_help("ap")).grid(row=i + 1, column=5)
+            self.class_rows.append((en, name_v, share_v, ealf_v, ap_v))
 
     def _build_tab_aashto(self):
         frm = ttk.LabelFrame(self.tab_aashto, text="Parámetros de diseño", padding=12)
         frm.pack(fill="x")
         for c in range(8):
             frm.columnconfigure(c, weight=1 if c in (1, 5) else 0)
-        self.v_rel = self._entry_with_help(frm, 0, "Confiabilidad R", "rel", "%", col=0)
-        self.v_so = self._entry_with_help(frm, 1, "So", "so", "-", col=0)
-        self.v_pi = self._entry_with_help(frm, 2, "Pi", "pi", "-", col=0)
-        self.v_pt = self._entry_with_help(frm, 3, "Pt", "pt", "-", col=0)
-        self.v_mr = self._entry_with_help(frm, 4, "Mr", "mr", "MPa", col=0)
+        self.v_rel = self._entry_with_help(frm, 0, "Confiabilidad R", "rel", "%")
+        self.v_so = self._entry_with_help(frm, 1, "So", "so")
+        self.v_pi = self._entry_with_help(frm, 2, "Pi", "pi")
+        self.v_pt = self._entry_with_help(frm, 3, "Pt", "pt")
+        self.v_mr = self._entry_with_help(frm, 4, "Mr", "mr", "MPa")
 
     def _build_tab_layers(self):
         frm1 = ttk.LabelFrame(self.tab_layers, text="Coeficientes estructurales", padding=12)
         frm1.pack(fill="x")
         for c in range(8):
             frm1.columnconfigure(c, weight=1 if c in (1, 5) else 0)
-        self.v_a1 = self._entry_with_help(frm1, 0, "a1", "a1", "-", col=0)
-        self.v_a2 = self._entry_with_help(frm1, 1, "a2", "a2", "-", col=0)
-        self.v_a3 = self._entry_with_help(frm1, 2, "a3", "a3", "-", col=0)
-        self.v_m2 = self._entry_with_help(frm1, 3, "m2", "m2", "-", col=0)
-        self.v_m3 = self._entry_with_help(frm1, 4, "m3", "m3", "-", col=0)
+        self.v_a1 = self._entry_with_help(frm1, 0, "a1", "a1")
+        self.v_a2 = self._entry_with_help(frm1, 1, "a2", "a2")
+        self.v_a3 = self._entry_with_help(frm1, 2, "a3", "a3")
+        self.v_m2 = self._entry_with_help(frm1, 3, "m2", "m2")
+        self.v_m3 = self._entry_with_help(frm1, 4, "m3", "m3")
 
         frm2 = ttk.LabelFrame(self.tab_layers, text="Búsqueda de espesores (pulgadas)", padding=12)
         frm2.pack(fill="x", pady=(10, 0))
@@ -267,10 +304,12 @@ class App:
 
         for idx, row in enumerate(t.get("truck_classes", [])):
             if idx < len(self.class_rows):
-                n, s_v, e = self.class_rows[idx]
+                en, n, s_v, e, ap = self.class_rows[idx]
+                en.set(bool(row.get("enabled", True)))
                 n.set(str(row.get("name", "")))
                 s_v.set(str(row.get("share_pct", "")))
                 e.set(str(row.get("ealf", "")))
+                ap.set(str(row.get("ap", 1.0)))
 
         self.v_rel.set(str(a["reliability_pct"]))
         self.v_so.set(str(a["so"]))
@@ -307,9 +346,15 @@ class App:
         t["use_detailed_tf"] = bool(self.v_use_detailed.get())
 
         classes = []
-        for n, s_v, e in self.class_rows:
+        for en, n, s_v, e, ap in self.class_rows:
             if n.get().strip() or s_v.get().strip() or e.get().strip():
-                classes.append({"name": n.get().strip() or "Clase", "share_pct": float(s_v.get()), "ealf": float(e.get())})
+                classes.append({
+                    "enabled": bool(en.get()),
+                    "name": n.get().strip() or "Clase",
+                    "share_pct": float(s_v.get() or 0),
+                    "ealf": float(e.get() or 0),
+                    "ap": float(ap.get() or 1),
+                })
         t["truck_classes"] = classes
 
         a["reliability_pct"] = float(self.v_rel.get())
@@ -339,35 +384,42 @@ class App:
         v = self.data["validation"]
 
         checks = [
-            ("TPDA", t["aadt_total"], v["aadt_min"], v["aadt_max"]),
-            ("% pesados", t["pct_trucks"], v["pct_trucks_min"], v["pct_trucks_max"]),
-            ("DD", t["dd"], v["dd_min"], v["dd_max"]),
-            ("DL", t["dl"], v["dl_min"], v["dl_max"]),
-            ("Crecimiento", t["growth_pct"], v["growth_min"], v["growth_max"]),
-            ("Mr", a["mr_mpa"], v["mr_min"], v["mr_max"]),
-            ("R", a["reliability_pct"], v["r_min"], v["r_max"]),
+            ("TPDA", t["aadt_total"], v["aadt_min"], v["aadt_max"], "Ajusta TPDA en Tránsito o cambia rango en Opciones."),
+            ("% pesados", t["pct_trucks"], v["pct_trucks_min"], v["pct_trucks_max"], "Verifica clasificación vehicular o corrige rango."),
+            ("DD", t["dd"], v["dd_min"], v["dd_max"], "DD típico 0.5-0.6 en muchas vías bidireccionales."),
+            ("DL", t["dl"], v["dl_min"], v["dl_max"], "En carril de diseño suele estar entre 0.7 y 1.0."),
+            ("Crecimiento", t["growth_pct"], v["growth_min"], v["growth_max"], "Revisa tasa histórica de crecimiento."),
+            ("Mr", a["mr_mpa"], v["mr_min"], v["mr_max"], "Revisa ensayo de subrasante y unidades (MPa)."),
+            ("R", a["reliability_pct"], v["r_min"], v["r_max"], "Usa confiabilidad acorde al tipo de camino."),
         ]
-        for name, val, low, high in checks:
+        for name, val, low, high, hint in checks:
             if not (low <= val <= high):
-                raise ValueError(f"{name}={val} está fuera del rango configurado [{low}, {high}]")
+                raise ValueError(
+                    f"No se puede calcular: {name}={val} está fuera del rango [{low}, {high}].\n"
+                    f"Sugerencia: {hint}"
+                )
 
     def show_help(self, key):
-        txt = HELP_TEXTS.get(key, "Ayuda no disponible.")
-        messagebox.showinfo("Ayuda", txt)
+        messagebox.showinfo("Ayuda", HELP_TEXTS.get(key, "Ayuda no disponible."))
 
     def on_options(self):
         win = tk.Toplevel(self.root)
         win.title("Opciones de validación")
-        win.geometry("520x420")
+        win.geometry("760x520")
         frame = ttk.Frame(win, padding=12)
         frame.pack(fill="both", expand=True)
 
+        ttk.Label(frame, text="Parámetro", font=("Segoe UI", 10, "bold")).grid(row=0, column=0, sticky="w")
+        ttk.Label(frame, text="Descripción", font=("Segoe UI", 10, "bold")).grid(row=0, column=1, sticky="w")
+        ttk.Label(frame, text="Valor", font=("Segoe UI", 10, "bold")).grid(row=0, column=2, sticky="w")
+
         vars_map = {}
-        row = 0
-        for key, val in self.data["validation"].items():
-            ttk.Label(frame, text=key).grid(row=row, column=0, sticky="w", pady=3)
-            sv = tk.StringVar(value=str(val))
-            ttk.Entry(frame, textvariable=sv).grid(row=row, column=1, sticky="ew", pady=3)
+        row = 1
+        for key, label, desc in VALIDATION_FIELDS:
+            ttk.Label(frame, text=label).grid(row=row, column=0, sticky="w", pady=2)
+            ttk.Label(frame, text=desc, foreground="#444").grid(row=row, column=1, sticky="w", pady=2)
+            sv = tk.StringVar(value=str(self.data["validation"].get(key, "")))
+            ttk.Entry(frame, textvariable=sv, width=16).grid(row=row, column=2, sticky="ew", pady=2)
             vars_map[key] = sv
             row += 1
         frame.columnconfigure(1, weight=1)
@@ -378,7 +430,7 @@ class App:
             win.destroy()
             messagebox.showinfo("Opciones", "Rangos de validación actualizados.")
 
-        ttk.Button(frame, text="Guardar", command=save_options).grid(row=row + 1, column=1, sticky="e", pady=10)
+        ttk.Button(frame, text="Guardar", command=save_options).grid(row=row + 1, column=2, sticky="e", pady=10)
 
     def _write_results(self, text):
         self.txt.configure(state="normal")
@@ -395,7 +447,14 @@ class App:
         path = filedialog.askopenfilename(title="Abrir proyecto", filetypes=[("Proyecto JSON", "*.json")])
         if not path:
             return
-        self.data = load_project(path)
+        loaded = load_project(path)
+        base = self.default_data()
+        for k, v in loaded.items():
+            if isinstance(v, dict) and isinstance(base.get(k), dict):
+                base[k].update(v)
+            else:
+                base[k] = v
+        self.data = base
         self._load_to_form()
         self._write_results(f"Proyecto cargado:\n{path}\n")
 
@@ -410,8 +469,7 @@ class App:
     def _compute_tf(self):
         t = self.data["traffic"]
         if t.get("use_detailed_tf"):
-            tf, breakdown = calc_truck_factor_detailed(t.get("truck_classes", []))
-            return tf, breakdown
+            return calc_truck_factor_detailed(t.get("truck_classes", []))
         return t["truck_factor"], None
 
     def on_calculate(self):
@@ -432,26 +490,34 @@ class App:
                 growth_pct=t["growth_pct"],
                 years=t["design_years"],
             )
-
             sn_req, zr = solve_sn_required(w18=w18, reliability_pct=a["reliability_pct"], so=a["so"], pi=a["pi"], pt=a["pt"], mr_mpa=a["mr_mpa"])
 
             rec_calc = recommend_thicknesses(
                 sn_required=sn_req,
-                a1=l["a1"],
-                a2=l["a2"],
-                a3=l["a3"],
-                m2=l["m2"],
-                m3=l["m3"],
+                a1=l["a1"], a2=l["a2"], a3=l["a3"],
+                m2=l["m2"], m3=l["m3"],
                 step_in=s["step_in"],
                 d1_fixed_in=s["d1_fixed_in"],
-                d2_min_in=s["d2_min_in"],
-                d2_max_in=s["d2_max_in"],
-                d3_min_in=s["d3_min_in"],
-                d3_max_in=s["d3_max_in"],
+                d2_min_in=s["d2_min_in"], d2_max_in=s["d2_max_in"],
+                d3_min_in=s["d3_min_in"], d3_max_in=s["d3_max_in"],
             )
 
             if rec_calc["status"] != "OK":
-                self._write_results("No se encontró solución con los límites definidos.")
+                best_sn = rec_calc.get("SN_best", 0.0)
+                deficit = max(0.0, sn_req - best_sn)
+                msg = (
+                    "No se puede calcular una combinación válida con tus límites actuales.\n\n"
+                    f"SN requerido: {sn_req:.3f}\n"
+                    f"Mejor SN encontrado con tus máximos: {best_sn:.3f}\n"
+                    f"Déficit aproximado: {deficit:.3f}\n\n"
+                    "Posibles soluciones:\n"
+                    "- Aumenta D2_max y/o D3_max\n"
+                    "- Incrementa D1 fijo\n"
+                    "- Reduce el paso de búsqueda\n"
+                    "- Revisa Mr, R, So y parámetros de tránsito"
+                )
+                self._write_results(msg)
+                self.nb.select(self.tab_results)
                 return
 
             rec_min = apply_minimums(rec_calc, w18)
@@ -467,40 +533,42 @@ class App:
                 "with_minimums": {**rec_min, "SN_provided": sn_min},
             }
 
-            if rec_min["minimums_govern"]:
-                mins = rec_min["minimum_table"]
-                messagebox.showwarning(
-                    "Aviso de mínimos",
-                    f"Los espesores mínimos gobernaron (Tabla 7-2, rango {mins['range_label']}).",
-                )
-
             out = []
             out.append("RESULTADOS AASHTO 1993\n\n")
             out.append(f"W18 acumulado: {w18:,.0f}\n")
             out.append(f"TF usado: {fnum(tf, 3)}\n")
+            out.append("Nota Ap: factor de ajuste por clase (multiplica a EALF por su participación).\n")
             out.append(f"Zr: {fnum(zr, 3)}\n")
             out.append(f"SN requerido: {fnum(sn_req, 3)}\n\n")
 
-            out.append("1) Espesores calculados\n")
+            out.append("1) Espesores calculados (SIN mínimos)\n")
             for k in ("D1_in", "D2_in", "D3_in"):
                 cm, cm_round = cm_pair(rec_calc[k])
                 out.append(f"- {k}: {fnum(rec_calc[k], 2)} in = {fnum(cm, 2)} cm (redondeado {cm_round} cm)\n")
             out.append(f"SN provisto calculado: {fnum(rec_calc['SN_provided'], 3)}\n\n")
 
-            out.append("2) Espesores con mínimos sugeridos\n")
+            out.append("2) Espesores ajustados con mínimos sugeridos (Tabla 7-2)\n")
             mins = rec_min["minimum_table"]
-            out.append(f"Tabla 7-2 aplicada: {mins['range_label']}\n")
+            out.append(f"Rango de tabla aplicado: {mins['range_label']}\n")
             for k in ("D1_in", "D2_in", "D3_in"):
                 cm, cm_round = cm_pair(rec_min[k])
                 out.append(f"- {k}: {fnum(rec_min[k], 2)} in = {fnum(cm, 2)} cm (redondeado {cm_round} cm)\n")
             out.append(f"SN provisto con mínimos: {fnum(sn_min, 3)}\n")
+            out.append(
+                "Observación: "
+                + ("Los mínimos SÍ modificaron la solución calculada." if rec_min["minimums_govern"] else "Los mínimos NO modificaron la solución calculada.")
+                + "\n"
+            )
+
+            if rec_min["minimums_govern"]:
+                messagebox.showwarning("Aviso de mínimos", "La solución final fue ajustada por espesores mínimos sugeridos (Tabla 7-2).")
 
             self._write_results("".join(out))
             self._draw_sections(rec_calc, rec_min)
             self.nb.select(self.tab_results)
 
         except Exception as e:
-            messagebox.showerror("Error de cálculo", str(e))
+            messagebox.showerror("Error de cálculo", f"No se puede calcular:\n{e}\n\nSugerencia: revisa entradas y rangos en Opciones.")
 
     def _draw_one_section(self, canvas, d1, d2, d3):
         canvas.delete("all")
@@ -509,20 +577,12 @@ class App:
         scale = h / total
         x1, x2 = 70, 430
         y = 40
-
-        layers = [
-            ("Carpeta", d1, "#474fa8"),
-            ("Base", d2, "#d1b06e"),
-            ("Subbase", d3, "#a0b370"),
-        ]
-
+        layers = [("Carpeta", d1, "#474fa8"), ("Base", d2, "#d1b06e"), ("Subbase", d3, "#a0b370")]
         for name, thk, color in layers:
             lh = thk * scale
             canvas.create_rectangle(x1, y, x2, y + lh, fill=color, outline="black")
-            cm = thk * 2.54
-            canvas.create_text((x1 + x2) / 2, y + lh / 2, text=f"{name}: {thk:.2f} in / {cm:.1f} cm", fill="white")
+            canvas.create_text((x1 + x2) / 2, y + lh / 2, text=f"{name}: {thk:.2f} in / {thk*2.54:.1f} cm", fill="white")
             y += lh
-
         canvas.create_rectangle(x1, y, x2, y + 70, fill="#9c7d5f", outline="black")
         canvas.create_text((x1 + x2) / 2, y + 35, text="Subrasante", fill="white")
 
@@ -534,15 +594,12 @@ class App:
         if not self.data.get("results"):
             messagebox.showwarning("PDF", "Primero calcula para generar el reporte.")
             return
-
         path = filedialog.asksaveasfilename(title="Exportar reporte", defaultextension=".pdf", filetypes=[("PDF", "*.pdf")])
         if not path:
             return
-
         try:
             from reportlab.lib.pagesizes import letter
             from reportlab.pdfgen import canvas
-
             c = canvas.Canvas(path, pagesize=letter)
             y = 760
             c.setFont("Helvetica-Bold", 13)
@@ -554,6 +611,7 @@ class App:
                 "W18 = 365*AADT*%pesados*DD*DL*TF*factor_crecimiento",
                 "log10(W18)=Zr*So+9.36log10(SN+1)-0.20+[log10(ΔPSI/2.7)]/(0.40+1094/(SN+1)^5.19)+2.32log10(Mr)-8.07",
                 "SN = a1*D1 + a2*m2*D2 + a3*m3*D3",
+                "TF detallado = Σ(participación_i * EALF_i * Ap_i)",
                 "",
             ]
             rs = self.data["results"]
