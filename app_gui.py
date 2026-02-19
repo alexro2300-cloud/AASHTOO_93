@@ -20,7 +20,6 @@ HELP_TEXTS = {
     "dd": "DD (factor direccional): fracción del tránsito en la dirección de diseño.",
     "dl": "DL (factor de carril): fracción del tránsito direccional que usa carril de diseño.",
     "tf": "TF manual: ESAL por vehículo pesado promedio.",
-    "ap": "Ap: factor de ajuste adicional para cada clase vehicular. Si no aplica, usar 1.0.",
 }
 
 VALIDATION_FIELDS = [
@@ -64,17 +63,19 @@ class App:
                 "use_detailed_tf": True,
                 "class_input_mode": "share_pct",
                 "truck_classes": [
-                    {"name": "C2", "share_pct": 10.0, "count": 1000.0, "ealf": 0.30, "ap": 1.0, "enabled": True},
-                    {"name": "C3", "share_pct": 10.0, "count": 1000.0, "ealf": 0.50, "ap": 1.0, "enabled": True},
-                    {"name": "C2-R2", "share_pct": 10.0, "count": 1000.0, "ealf": 0.80, "ap": 1.0, "enabled": True},
-                    {"name": "C3-R2", "share_pct": 10.0, "count": 1000.0, "ealf": 1.00, "ap": 1.0, "enabled": True},
-                    {"name": "C2-R3", "share_pct": 10.0, "count": 1000.0, "ealf": 1.10, "ap": 1.0, "enabled": True},
-                    {"name": "C3-R3", "share_pct": 10.0, "count": 1000.0, "ealf": 1.30, "ap": 1.0, "enabled": True},
-                    {"name": "T2-S1", "share_pct": 10.0, "count": 1000.0, "ealf": 1.40, "ap": 1.0, "enabled": True},
-                    {"name": "T2-S2", "share_pct": 10.0, "count": 1000.0, "ealf": 1.60, "ap": 1.0, "enabled": True},
-                    {"name": "T2-S3", "share_pct": 10.0, "count": 1000.0, "ealf": 1.90, "ap": 1.0, "enabled": True},
-                    {"name": "T3-S2", "share_pct": 5.0, "count": 500.0, "ealf": 2.10, "ap": 1.0, "enabled": True},
-                    {"name": "T3-S3", "share_pct": 5.0, "count": 500.0, "ealf": 2.40, "ap": 1.0, "enabled": True},
+                    {"name": "A", "share_pct": 25.0, "count": 2500.0, "ealf": 0.05, "enabled": True},
+                    {"name": "B", "share_pct": 15.0, "count": 1500.0, "ealf": 0.20, "enabled": True},
+                    {"name": "C2", "share_pct": 8.0, "count": 800.0, "ealf": 0.30, "enabled": True},
+                    {"name": "C3", "share_pct": 10.0, "count": 1000.0, "ealf": 0.50, "enabled": True},
+                    {"name": "C2-R2", "share_pct": 10.0, "count": 1000.0, "ealf": 0.80, "enabled": True},
+                    {"name": "C3-R2", "share_pct": 10.0, "count": 1000.0, "ealf": 1.00, "enabled": True},
+                    {"name": "C2-R3", "share_pct": 10.0, "count": 1000.0, "ealf": 1.10, "enabled": True},
+                    {"name": "C3-R3", "share_pct": 10.0, "count": 1000.0, "ealf": 1.30, "enabled": True},
+                    {"name": "T2-S1", "share_pct": 10.0, "count": 1000.0, "ealf": 1.40, "enabled": True},
+                    {"name": "T2-S2", "share_pct": 10.0, "count": 1000.0, "ealf": 1.60, "enabled": True},
+                    {"name": "T2-S3", "share_pct": 10.0, "count": 1000.0, "ealf": 1.90, "enabled": True},
+                    {"name": "T3-S2", "share_pct": 5.0, "count": 500.0, "ealf": 2.10, "enabled": True},
+                    {"name": "T3-S3", "share_pct": 5.0, "count": 500.0, "ealf": 2.40, "enabled": True},
                 ],
             },
             "aashto": {"reliability_pct": 95.0, "so": 0.49, "pi": 4.2, "pt": 2.5, "mr_mpa": 70.0},
@@ -176,20 +177,19 @@ class App:
 
         cls = ttk.LabelFrame(self.tab_traffic, text="Clasificación vehicular (activar/desactivar por tipo)", padding=10)
         cls.pack(fill="both", expand=True, pady=(10, 0))
-        headers = ["Usar", "Nomenclatura", "Participación %", "Tránsito (veh/día)", "EALF", "Ap"]
+        headers = ["Usar", "Nomenclatura", "Participación %", "Tránsito (veh/día)", "EALF"]
         for i, h in enumerate(headers):
             ttk.Label(cls, text=h).grid(row=0, column=i, sticky="w")
 
         self.class_rows = []
         self.share_entries = []
         self.count_entries = []
-        for i in range(11):
+        for i in range(13):
             en = tk.BooleanVar(value=True)
             name_v = tk.StringVar()
             share_v = tk.StringVar()
             count_v = tk.StringVar()
             ealf_v = tk.StringVar()
-            ap_v = tk.StringVar(value="1.0")
             ttk.Checkbutton(cls, variable=en).grid(row=i + 1, column=0, sticky="w")
             ttk.Entry(cls, textvariable=name_v, width=12).grid(row=i + 1, column=1, sticky="ew", padx=2, pady=2)
             e_share = ttk.Entry(cls, textvariable=share_v, width=10)
@@ -197,12 +197,23 @@ class App:
             e_count = ttk.Entry(cls, textvariable=count_v, width=12)
             e_count.grid(row=i + 1, column=3, sticky="ew", padx=2, pady=2)
             ttk.Entry(cls, textvariable=ealf_v, width=10).grid(row=i + 1, column=4, sticky="ew", padx=2, pady=2)
-            ttk.Entry(cls, textvariable=ap_v, width=8).grid(row=i + 1, column=5, sticky="ew", padx=2, pady=2)
-            self.class_rows.append((en, name_v, share_v, count_v, ealf_v, ap_v))
+            self.class_rows.append((en, name_v, share_v, count_v, ealf_v))
             self.share_entries.append(e_share)
             self.count_entries.append(e_count)
             count_v.trace_add("write", self._auto_update_aadt_from_counts)
             en.trace_add("write", self._auto_update_aadt_from_counts)
+
+        actions = ttk.Frame(self.tab_traffic)
+        actions.pack(fill="x", pady=(8,0))
+        ttk.Button(actions, text="Calcular ESALs", command=self.on_calculate_esals).pack(side="left")
+
+        self.v_esal_warn = tk.StringVar(value="")
+        ttk.Label(actions, textvariable=self.v_esal_warn, foreground="#b00020", font=("Segoe UI", 10, "bold")).pack(side="left", padx=12)
+
+        box = ttk.LabelFrame(self.tab_traffic, text="Ejes equivalentes acumulados W18", padding=10)
+        box.pack(fill="x", pady=(10,0))
+        self.v_w18_traffic = tk.StringVar(value="0")
+        ttk.Label(box, textvariable=self.v_w18_traffic, foreground="#0b5394", font=("Segoe UI", 22, "bold")).pack(anchor="center")
 
     def _build_tab_aashto(self):
         frm = ttk.LabelFrame(self.tab_aashto, text="Parámetros de diseño", padding=12)
@@ -240,7 +251,11 @@ class App:
         ttk.Label(self.tab_layers, text="SN1, SN2 y SN3 objetivo son ingresados por el usuario para el método secuencial.", foreground="#444").pack(anchor="w", pady=(8, 0))
 
     def _build_tab_results(self):
-        self.txt = tk.Text(self.tab_results, height=30, wrap="word")
+        top = ttk.LabelFrame(self.tab_results, text="W18 acumulado", padding=8)
+        top.pack(fill="x", pady=(0,8))
+        self.v_w18_big = tk.StringVar(value="0")
+        ttk.Label(top, textvariable=self.v_w18_big, foreground="#0b5394", font=("Segoe UI", 24, "bold")).pack(anchor="center")
+        self.txt = tk.Text(self.tab_results, height=24, wrap="word")
         self.txt.pack(fill="both", expand=True)
         self.txt.configure(state="disabled")
 
@@ -271,6 +286,10 @@ class App:
         row(2, "Costo base", self.v_cost_d2, "$/m³")
         row(3, "Costo subbase", self.v_cost_d3, "$/m³")
 
+        btnf = ttk.Frame(self.tab_costs)
+        btnf.pack(fill="x", pady=(8,0))
+        ttk.Button(btnf, text="Calcular costos", command=self.on_calculate_costs).pack(side="left")
+
         self.txt_cost = tk.Text(self.tab_costs, height=16, wrap="word")
         self.txt_cost.pack(fill="both", expand=True, pady=(10, 0))
         self.txt_cost.configure(state="disabled")
@@ -293,8 +312,8 @@ class App:
         self.v_tf.set(str(t["truck_factor"])); self.v_growth.set(str(t["growth_pct"])); self.v_years.set(str(t["design_years"])); self.v_use_detailed.set(bool(t.get("use_detailed_tf", False))); self.v_class_input_mode.set(t.get("class_input_mode", "share_pct"))
         for idx, row in enumerate(t.get("truck_classes", [])):
             if idx < len(self.class_rows):
-                en, n, s_v, c_v, e, ap = self.class_rows[idx]
-                en.set(bool(row.get("enabled", True))); n.set(str(row.get("name", ""))); s_v.set(str(row.get("share_pct", ""))); c_v.set(str(row.get("count", ""))); e.set(str(row.get("ealf", ""))); ap.set(str(row.get("ap", 1.0)))
+                en, n, s_v, c_v, e = self.class_rows[idx]
+                en.set(bool(row.get("enabled", True))); n.set(str(row.get("name", ""))); s_v.set(str(row.get("share_pct", ""))); c_v.set(str(row.get("count", ""))); e.set(str(row.get("ealf", "")))
         self.v_rel.set(str(a["reliability_pct"])); self.v_so.set(str(a["so"])); self.v_pi.set(str(a["pi"])); self.v_pt.set(str(a["pt"])); self.v_mr.set(str(a["mr_mpa"]))
         self.v_a1.set(str(l["a1"])); self.v_a2.set(str(l["a2"])); self.v_a3.set(str(l["a3"])); self.v_m2.set(str(l["m2"])); self.v_m3.set(str(l["m3"])); self.v_sn1.set(str(l["sn1_target"])); self.v_sn2.set(str(l["sn2_target"])); self.v_sn3.set(str(l["sn3_target"]))
         c = self.data["prelim_costs"]
@@ -307,9 +326,9 @@ class App:
         t["aadt_total"] = float(self.v_aadt.get()); t["pct_trucks"] = float(self.v_pct_trucks.get()); t["dd"] = float(self.v_dd.get()); t["dl"] = float(self.v_dl.get())
         t["truck_factor"] = float(self.v_tf.get()); t["growth_pct"] = float(self.v_growth.get()); t["design_years"] = int(float(self.v_years.get())); t["use_detailed_tf"] = bool(self.v_use_detailed.get()); t["class_input_mode"] = self.v_class_input_mode.get()
         classes = []
-        for en, n, s_v, c_v, e, ap in self.class_rows:
+        for en, n, s_v, c_v, e in self.class_rows:
             if n.get().strip() or s_v.get().strip() or c_v.get().strip() or e.get().strip():
-                classes.append({"enabled": bool(en.get()), "name": n.get().strip() or "Clase", "share_pct": float(s_v.get() or 0), "count": float(c_v.get() or 0), "ealf": float(e.get() or 0), "ap": float(ap.get() or 1)})
+                classes.append({"enabled": bool(en.get()), "name": n.get().strip() or "Clase", "share_pct": float(s_v.get() or 0), "count": float(c_v.get() or 0), "ealf": float(e.get() or 0)})
         t["truck_classes"] = classes
         if t.get("class_input_mode") == "count":
             t["aadt_total"] = sum(r["count"] for r in classes if r["enabled"])
@@ -328,7 +347,7 @@ class App:
         if self.v_class_input_mode.get() != "count":
             return
         total = 0.0
-        for en, _, _, c_v, _, _ in self.class_rows:
+        for en, _, _, c_v, _ in self.class_rows:
             if not en.get():
                 continue
             try:
@@ -507,6 +526,54 @@ class App:
         )
         return w18, t["truck_factor"], None
 
+
+    def on_calculate_esals(self):
+        try:
+            self._read_form_to_data()
+            w18, tf, breakdown = self._compute_traffic_load()
+            self.data.setdefault("results", {})["W18"] = w18
+            self.data["results"]["TF_used"] = tf
+            self.data["results"]["TF_breakdown"] = breakdown
+            self.v_w18_traffic.set(f"{w18:,.0f}")
+            self.v_w18_big.set(f"{w18:,.0f}")
+            self.v_esal_warn.set("⚠ Solo se han calculado ESALs. Ejecuta 'Calcular' para actualizar espesores.")
+            messagebox.showwarning("ESALs", "Solo se calculó tránsito/ESALs. Ejecuta 'Calcular' para actualizar espesores y costos.")
+        except Exception as e:
+            messagebox.showerror("ESALs", f"No se pudo calcular ESALs:\n{e}")
+
+    def _compute_costs(self, calc: dict, mins: dict):
+        cst = self.data["prelim_costs"]
+        width = cst["width_m"]
+        v1 = (calc["D1_in"] * 0.0254) * width * 1000
+        v2 = (calc["D2_in"] * 0.0254) * width * 1000
+        v3 = (calc["D3_in"] * 0.0254) * width * 1000
+        calc_cost = v1*cst["cost_d1"] + v2*cst["cost_d2"] + v3*cst["cost_d3"]
+        m1 = (mins["D1_in"] * 0.0254) * width * 1000
+        m2 = (mins["D2_in"] * 0.0254) * width * 1000
+        m3 = (mins["D3_in"] * 0.0254) * width * 1000
+        min_cost = m1*cst["cost_d1"] + m2*cst["cost_d2"] + m3*cst["cost_d3"]
+        return {
+            "width_m": width,
+            "calculated": {"vol_d1": v1, "vol_d2": v2, "vol_d3": v3, "cost_d1": v1*cst["cost_d1"], "cost_d2": v2*cst["cost_d2"], "cost_d3": v3*cst["cost_d3"], "total": calc_cost},
+            "minimums": {"vol_d1": m1, "vol_d2": m2, "vol_d3": m3, "cost_d1": m1*cst["cost_d1"], "cost_d2": m2*cst["cost_d2"], "cost_d3": m3*cst["cost_d3"], "total": min_cost},
+        }
+
+    def on_calculate_costs(self):
+        try:
+            self._read_form_to_data()
+            rs = self.data.get("results", {})
+            calc = rs.get("calculated")
+            mins = rs.get("with_minimums")
+            if not calc or not mins:
+                messagebox.showwarning("Costos", "Primero ejecuta 'Calcular' para obtener espesores.")
+                return
+            costs = self._compute_costs(calc, mins)
+            self.data["results"]["costs"] = costs
+            self._write_text(self.txt_cost, self._build_costs_text(costs))
+            self.nb.select(self.tab_costs)
+        except Exception as e:
+            messagebox.showerror("Costos", f"No se pudo calcular costos:\n{e}")
+
     def on_calculate(self):
         try:
             self._read_form_to_data()
@@ -521,24 +588,12 @@ class App:
             )
             mins = apply_minimums_sequential(calc, w18, l["a1"], l["a2"], l["a3"], l["m2"], l["m3"], sn3_target, self.data.get("minimums_table"))
 
-            cst = self.data["prelim_costs"]
-            width = cst["width_m"]
-            v1 = (calc["D1_in"] * 0.0254) * width * 1000
-            v2 = (calc["D2_in"] * 0.0254) * width * 1000
-            v3 = (calc["D3_in"] * 0.0254) * width * 1000
-            calc_cost = v1*cst["cost_d1"] + v2*cst["cost_d2"] + v3*cst["cost_d3"]
-            m1 = (mins["D1_in"] * 0.0254) * width * 1000
-            m2 = (mins["D2_in"] * 0.0254) * width * 1000
-            m3 = (mins["D3_in"] * 0.0254) * width * 1000
-            min_cost = m1*cst["cost_d1"] + m2*cst["cost_d2"] + m3*cst["cost_d3"]
-
-            costs = {
-                "width_m": width,
-                "calculated": {"vol_d1": v1, "vol_d2": v2, "vol_d3": v3, "total": calc_cost},
-                "minimums": {"vol_d1": m1, "vol_d2": m2, "vol_d3": m3, "total": min_cost},
-            }
+            costs = self._compute_costs(calc, mins)
 
             self.data["results"] = {"W18": w18, "SN3_target": sn3_target, "SN3_aashto": sn3_aashto, "Zr": zr, "TF_used": tf, "TF_breakdown": tf_breakdown, "calculated": calc, "with_minimums": mins, "costs": costs}
+            self.v_w18_big.set(f"{w18:,.0f}")
+            self.v_w18_traffic.set(f"{w18:,.0f}")
+            self.v_esal_warn.set("")
 
             out = []
             out.append("RESULTADOS AASHTO 1993\n\n")
@@ -607,15 +662,15 @@ class App:
         lines.append(f"Costo carpeta: {c['cost_d1']:.2f} $/m³ | base: {c['cost_d2']:.2f} $/m³ | subbase: {c['cost_d3']:.2f} $/m³\n\n")
 
         lines.append("1) Solución calculada\n")
-        lines.append(f"- Vol carpeta: {costs['calculated']['vol_d1']:.2f} m³/km\n")
-        lines.append(f"- Vol base: {costs['calculated']['vol_d2']:.2f} m³/km\n")
-        lines.append(f"- Vol subbase: {costs['calculated']['vol_d3']:.2f} m³/km\n")
+        lines.append(f"- Carpeta: Vol {costs['calculated']['vol_d1']:.2f} m³/km | Costo {costs['calculated']['cost_d1']:.2f} $/km\n")
+        lines.append(f"- Base: Vol {costs['calculated']['vol_d2']:.2f} m³/km | Costo {costs['calculated']['cost_d2']:.2f} $/km\n")
+        lines.append(f"- Subbase: Vol {costs['calculated']['vol_d3']:.2f} m³/km | Costo {costs['calculated']['cost_d3']:.2f} $/km\n")
         lines.append(f"- Costo total: {costs['calculated']['total']:.2f} $/km\n\n")
 
         lines.append("2) Solución con mínimos\n")
-        lines.append(f"- Vol carpeta: {costs['minimums']['vol_d1']:.2f} m³/km\n")
-        lines.append(f"- Vol base: {costs['minimums']['vol_d2']:.2f} m³/km\n")
-        lines.append(f"- Vol subbase: {costs['minimums']['vol_d3']:.2f} m³/km\n")
+        lines.append(f"- Carpeta: Vol {costs['minimums']['vol_d1']:.2f} m³/km | Costo {costs['minimums']['cost_d1']:.2f} $/km\n")
+        lines.append(f"- Base: Vol {costs['minimums']['vol_d2']:.2f} m³/km | Costo {costs['minimums']['cost_d2']:.2f} $/km\n")
+        lines.append(f"- Subbase: Vol {costs['minimums']['vol_d3']:.2f} m³/km | Costo {costs['minimums']['cost_d3']:.2f} $/km\n")
         lines.append(f"- Costo total: {costs['minimums']['total']:.2f} $/km\n")
         return "".join(lines)
 

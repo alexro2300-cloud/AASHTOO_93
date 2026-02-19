@@ -30,8 +30,8 @@ def calc_w18_from_daily_esal(daily_esal: float, dd: float, dl: float, growth_pct
 
 def calc_truck_factor_detailed(vehicle_classes: list[dict], mode: str = "share_pct", aadt_total: float | None = None) -> tuple[float, dict]:
     """
-    mode='share_pct': TF = Σ(share_i * ealf_i * ap_i)
-    mode='count': calcula ESAL diario = Σ(count_i * ealf_i * ap_i) y valida suma de conteos ≈ TPDA.
+    mode='share_pct': TF = Σ(share_i * EALF_i)
+    mode='count': ESAL diario = Σ(count_i * EALF_i) y valida suma de conteos = TPDA.
     """
     if not vehicle_classes:
         raise ValueError("Debes ingresar al menos una clase vehicular")
@@ -53,30 +53,27 @@ def calc_truck_factor_detailed(vehicle_classes: list[dict], mode: str = "share_p
         share_pct = float(row.get("share_pct", 0.0))
         count = float(row.get("count", 0.0))
         ealf = float(row.get("ealf", 0.0))
-        ap = float(row.get("ap", 1.0))
 
-        if share_pct < 0 or ealf < 0 or ap < 0 or count < 0:
-            raise ValueError("Participación, tránsito, EALF y Ap por clase deben ser >= 0")
+        if share_pct < 0 or ealf < 0 or count < 0:
+            raise ValueError("Participación, tránsito y EALF por clase deben ser >= 0")
 
         if mode == "count":
-            contrib_daily = count * ealf * ap
+            contrib_daily = count * ealf
             daily_esal += contrib_daily
             total_count += count
             breakdown[name] = {
                 "count": count,
                 "ealf": ealf,
-                "ap": ap,
                 "daily_esal_contribution": contrib_daily,
             }
         else:
             share = share_pct / 100.0
-            contrib = share * ealf * ap
+            contrib = share * ealf
             total_share += share_pct
             tf += contrib
             breakdown[name] = {
                 "share_pct": share_pct,
                 "ealf": ealf,
-                "ap": ap,
                 "contribution": contrib,
             }
 
