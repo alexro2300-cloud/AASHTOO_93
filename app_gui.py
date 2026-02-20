@@ -118,9 +118,12 @@ class App:
 
         top = ttk.Frame(self.root, padding=10)
         top.pack(fill="x")
+        top.columnconfigure(0, weight=1)
+        top.columnconfigure(1, weight=3)
+        top.columnconfigure(2, weight=1)
 
         logo_wrap = ttk.Frame(top)
-        logo_wrap.pack(side="left")
+        logo_wrap.grid(row=0, column=0, sticky="w")
         school_logo = self._load_ui_image("logo_school", subsample=2)
         if school_logo:
             ttk.Label(logo_wrap, image=school_logo).pack(side="left", padx=(0, 6))
@@ -133,12 +136,27 @@ class App:
         else:
             ttk.Label(logo_wrap, text="[Logo Laboratorio]", foreground="#666").pack(side="left", padx=(0, 8))
 
-        ttk.Label(logo_wrap, text="Calculadora de Espesores de Pavimento Flexible por el método AASHTO", style="Title.TLabel").pack(side="left")
+        ttk.Label(
+            top,
+            text="Calculadora de Espesores de Pavimento Flexible por el método AASHTO",
+            style="Title.TLabel",
+            anchor="center",
+            justify="center",
+        ).grid(row=0, column=1, sticky="ew")
 
-        btns = ttk.Frame(top)
-        btns.pack(side="right")
-        for txt, cmd in [("Nuevo", self.on_new), ("Abrir", self.on_open), ("Guardar", self.on_save), ("Opciones", self.on_options), ("Calcular", self.on_calculate), ("PDF", self.on_export_pdf)]:
-            ttk.Button(btns, text=txt, command=cmd).pack(side="left", padx=4)
+        actions_btn = ttk.Menubutton(top, text="Acciones")
+        actions_btn.grid(row=0, column=2, sticky="e")
+        actions_menu = tk.Menu(actions_btn, tearoff=False)
+        for txt, cmd in [
+            ("Nuevo", self.on_new),
+            ("Abrir", self.on_open),
+            ("Guardar", self.on_save),
+            ("Opciones", self.on_options),
+            ("Calcular", self.on_calculate),
+            ("PDF", self.on_export_pdf),
+        ]:
+            actions_menu.add_command(label=txt, command=cmd)
+        actions_btn["menu"] = actions_menu
 
         self.nb = ttk.Notebook(self.root)
         self.nb.pack(fill="both", expand=True, padx=10, pady=8)
