@@ -276,10 +276,6 @@ class App:
         self.txt_calc_thickness.configure(state="disabled")
 
     def _build_tab_results(self):
-        top = ttk.LabelFrame(self.tab_results, text="Resultado final de espesores", padding=8)
-        top.pack(fill="x", pady=(0,8))
-        self.v_w18_big = tk.StringVar(value="0")
-        ttk.Label(top, textvariable=self.v_w18_big, foreground="#0b5394", font=("Segoe UI", 24, "bold")).pack(anchor="center")
         body = ttk.Frame(self.tab_results)
         body.pack(fill="both", expand=True)
         self.txt = tk.Text(body, height=24, wrap="word")
@@ -628,7 +624,6 @@ class App:
             self.data.setdefault("results", {})["W18"] = w18
             self.data["results"]["ESAL_detail"] = esal_detail
             self.v_w18_traffic.set(f"{w18:,.0f}")
-            self.v_w18_big.set(f"{w18:,.0f}")
             self._write_text(self.txt_calc_esals, self._format_esal_breakdown(esal_detail))
             self.v_esal_warn.set("⚠ Solo se han calculado ESALs. Ejecuta 'Calcular' para actualizar espesores.")
             self.nb.select(self.tab_calc_esals)
@@ -686,21 +681,22 @@ class App:
             costs = self._compute_costs(calc, mins)
 
             self.data["results"] = {"W18": w18, "SN3_target": sn3_target, "SN3_aashto": sn3_aashto, "Zr": zr, "ESAL_detail": esal_detail, "calculated": calc, "with_minimums": mins, "costs": costs}
-            self.v_w18_big.set(f"{w18:,.0f}")
             self.v_w18_traffic.set(f"{w18:,.0f}")
             self.v_esal_warn.set("")
 
             out = []
-            out.append("RESULTADOS SIMPLIFICADOS DE ESPESORES\n\n")
-            out.append(f"W18 acumulado: {w18:,.0f}\n")
-            out.append(f"SN3 objetivo (usuario): {fnum(sn3_target,3)} | SN3 AASHTO ref.: {fnum(sn3_aashto,3)}\n\n")
-            out.append("Espesores finales con mínimos sugeridos:\n")
+            out.append("RESULTADOS FINALES DE ESPESORES\n\n")
+            out.append("A) Espesores calculados (sin mínimos)\n")
+            out.append(f"- D1: {fnum(calc['D1_in'],2)} in | {fnum(calc['D1_cm'],2)} cm\n")
+            out.append(f"- D2: {fnum(calc['D2_in'],2)} in | {fnum(calc['D2_cm'],2)} cm\n")
+            out.append(f"- D3: {fnum(calc['D3_in'],2)} in | {fnum(calc['D3_cm'],2)} cm\n")
+            out.append(f"- SN total corregido: {fnum(calc['SN_sum'],3)}\n\n")
+            out.append("B) Espesores con mínimos sugeridos\n")
             out.append(f"- D1: {fnum(mins['D1_in'],2)} in | {fnum(mins['D1_cm'],2)} cm\n")
             out.append(f"- D2: {fnum(mins['D2_in'],2)} in | {fnum(mins['D2_cm'],2)} cm\n")
             out.append(f"- D3: {fnum(mins['D3_in'],2)} in | {fnum(mins['D3_cm'],2)} cm\n")
-            out.append(f"SN total corregido: {fnum(mins['SN_sum'],3)}\n")
-            out.append(f"Rango de mínimos aplicado: {mins['minimum_table']['range_label']}\n")
-
+            out.append(f"- SN total corregido: {fnum(mins['SN_sum'],3)}\n")
+            out.append(f"- Rango de mínimos aplicado: {mins['minimum_table']['range_label']}\n")
             self._write_text(self.txt, "".join(out))
             self._write_text(self.txt_calc_esals, self._format_esal_breakdown(esal_detail))
             self._write_text(self.txt_calc_thickness, self._build_calculos_text(calc, mins, l, sn3_target))
