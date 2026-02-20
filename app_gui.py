@@ -626,6 +626,8 @@ class App:
         win.title(f"Ayuda: {key}")
         win.geometry("760x520")
         win.transient(self.root)
+        win.bind("<Escape>", lambda _e: win.destroy())
+        win.focus_set()
 
         frm = ttk.Frame(win, padding=10)
         frm.pack(fill="both", expand=True)
