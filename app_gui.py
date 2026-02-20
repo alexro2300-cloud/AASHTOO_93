@@ -118,6 +118,7 @@ class App:
         self.tab_calc_thickness = ttk.Frame(self.nb, padding=12)
         self.tab_costs = ttk.Frame(self.nb, padding=12)
         self.tab_section = ttk.Frame(self.nb, padding=12)
+        self.tab_legal = ttk.Frame(self.nb, padding=12)
 
         self.nb.add(self.tab_traffic, text="Tránsito / ESALs")
         self.nb.add(self.tab_calc_esals, text="Cálculos ESALs")
@@ -127,6 +128,7 @@ class App:
         self.nb.add(self.tab_results, text="Resultados")
         self.nb.add(self.tab_costs, text="Costos preliminares")
         self.nb.add(self.tab_section, text="Sección de Pavimento")
+        self.nb.add(self.tab_legal, text="Legal")
 
         self._build_tab_traffic()
         self._build_tab_calc_esals()
@@ -136,7 +138,35 @@ class App:
         self._build_tab_results()
         self._build_tab_costs()
         self._build_tab_section()
+        self._build_tab_legal()
         self._load_to_form()
+
+    def _bind_mousewheel(self, scrollable):
+        def on_wheel(event):
+            if getattr(event, "num", None) == 4:
+                step = -1
+            elif getattr(event, "num", None) == 5:
+                step = 1
+            else:
+                delta = getattr(event, "delta", 0)
+                step = -1 if delta > 0 else 1
+            try:
+                scrollable.yview_scroll(step, "units")
+            except Exception:
+                return
+
+        def bind_all(_):
+            self.root.bind_all("<MouseWheel>", on_wheel)
+            self.root.bind_all("<Button-4>", on_wheel)
+            self.root.bind_all("<Button-5>", on_wheel)
+
+        def unbind_all(_):
+            self.root.unbind_all("<MouseWheel>")
+            self.root.unbind_all("<Button-4>")
+            self.root.unbind_all("<Button-5>")
+
+        scrollable.bind("<Enter>", bind_all)
+        scrollable.bind("<Leave>", unbind_all)
 
     def _entry_with_help(self, parent, row, label, key, unit="", col=0):
         ttk.Label(parent, text=label).grid(row=row, column=col, sticky="w", pady=3)
@@ -173,14 +203,15 @@ class App:
         cls.pack(fill="both", expand=True, pady=(10, 0))
         grid_holder = ttk.Frame(cls)
         grid_holder.pack(fill="both", expand=True)
-        canvas = tk.Canvas(grid_holder, highlightthickness=0)
-        sc = ttk.Scrollbar(grid_holder, orient="vertical", command=canvas.yview)
-        table = ttk.Frame(canvas)
-        table.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
-        canvas.create_window((0, 0), window=table, anchor="nw")
-        canvas.configure(yscrollcommand=sc.set)
-        canvas.pack(side="left", fill="both", expand=True)
+        self.traffic_canvas = tk.Canvas(grid_holder, highlightthickness=0)
+        sc = ttk.Scrollbar(grid_holder, orient="vertical", command=self.traffic_canvas.yview)
+        table = ttk.Frame(self.traffic_canvas)
+        table.bind("<Configure>", lambda e: self.traffic_canvas.configure(scrollregion=self.traffic_canvas.bbox("all")))
+        self.traffic_canvas.create_window((0, 0), window=table, anchor="nw")
+        self.traffic_canvas.configure(yscrollcommand=sc.set)
+        self.traffic_canvas.pack(side="left", fill="both", expand=True)
         sc.pack(side="right", fill="y")
+        self._bind_mousewheel(self.traffic_canvas)
 
         headers = ["Usar", "Nomenclatura", "Participación %", "Tránsito (veh/día)", "EALF"]
         for i, h in enumerate(headers):
@@ -263,6 +294,7 @@ class App:
         self.txt_calc_esals.configure(yscrollcommand=sc.set)
         self.txt_calc_esals.pack(side="left", fill="both", expand=True)
         sc.pack(side="right", fill="y")
+        self._bind_mousewheel(self.txt_calc_esals)
         self.txt_calc_esals.configure(state="disabled")
 
     def _build_tab_calc_thickness(self):
@@ -273,6 +305,7 @@ class App:
         self.txt_calc_thickness.configure(yscrollcommand=sc.set)
         self.txt_calc_thickness.pack(side="left", fill="both", expand=True)
         sc.pack(side="right", fill="y")
+        self._bind_mousewheel(self.txt_calc_thickness)
         self.txt_calc_thickness.configure(state="disabled")
 
     def _build_tab_results(self):
@@ -283,6 +316,7 @@ class App:
         self.txt.configure(yscrollcommand=sc.set)
         self.txt.pack(side="left", fill="both", expand=True)
         sc.pack(side="right", fill="y")
+        self._bind_mousewheel(self.txt)
         self.txt.configure(state="disabled")
 
     def _build_tab_costs(self):
@@ -317,6 +351,7 @@ class App:
         self.txt_cost.configure(yscrollcommand=sc.set)
         self.txt_cost.pack(side="left", fill="both", expand=True)
         sc.pack(side="right", fill="y")
+        self._bind_mousewheel(self.txt_cost)
         self.txt_cost.configure(state="disabled")
 
     def _build_tab_section(self):
@@ -330,6 +365,27 @@ class App:
         self.canvas_min = tk.Canvas(holder, width=500, height=520, bg="white")
         self.canvas_calc.grid(row=1, column=0, sticky="nsew", padx=6, pady=6)
         self.canvas_min.grid(row=1, column=1, sticky="nsew", padx=6, pady=6)
+
+    def _build_tab_legal(self):
+        body = ttk.Frame(self.tab_legal)
+        body.pack(fill="both", expand=True)
+        txt = tk.Text(body, height=22, wrap="word")
+        sc = ttk.Scrollbar(body, orient="vertical", command=txt.yview)
+        txt.configure(yscrollcommand=sc.set)
+        txt.pack(side="left", fill="both", expand=True)
+        sc.pack(side="right", fill="y")
+        self._bind_mousewheel(txt)
+
+        legal = []
+        legal.append("AVISO LEGAL Y ACADÉMICO\n\n")
+        legal.append("Este software es meramente educativo y de apoyo académico.\n")
+        legal.append("Fue desarrollado con ayuda de una Inteligencia Artificial (IA).\n")
+        legal.append("Está hecho por y para la ESIA, en el Laboratorio de Pavimentos, ")
+        legal.append("bajo la coordinación del Ing. José Santos Arriaga Soto.\n\n")
+        legal.append("El usuario es responsable de validar cualquier resultado antes de aplicarlo en campo.\n")
+
+        txt.insert("1.0", "".join(legal))
+        txt.configure(state="disabled")
 
     def _load_to_form(self):
         t = self.data["traffic"]; a = self.data["aashto"]; l = self.data["layers"]
@@ -489,6 +545,7 @@ class App:
         canvas.configure(yscrollcommand=sc.set)
         canvas.pack(side="left", fill="both", expand=True)
         sc.pack(side="right", fill="y")
+        self._bind_mousewheel(canvas)
 
         ttk.Label(container, text="Rangos de validación", font=("Segoe UI", 11, "bold")).grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 6))
         ttk.Label(container, text="Parámetro", font=("Segoe UI", 10, "bold")).grid(row=1, column=0, sticky="w")
