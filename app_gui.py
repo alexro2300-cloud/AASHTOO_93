@@ -241,7 +241,19 @@ class App:
         return v
 
     def _build_tab_traffic(self):
-        frm = ttk.LabelFrame(self.tab_traffic, text="Datos de tránsito", padding=12)
+        holder = ttk.Frame(self.tab_traffic)
+        holder.pack(fill="both", expand=True)
+        tab_canvas = tk.Canvas(holder, highlightthickness=0)
+        tab_scroll = ttk.Scrollbar(holder, orient="vertical", command=tab_canvas.yview)
+        content = ttk.Frame(tab_canvas)
+        content.bind("<Configure>", lambda e: tab_canvas.configure(scrollregion=tab_canvas.bbox("all")))
+        tab_canvas.create_window((0, 0), window=content, anchor="nw")
+        tab_canvas.configure(yscrollcommand=tab_scroll.set)
+        tab_canvas.pack(side="left", fill="both", expand=True)
+        tab_scroll.pack(side="right", fill="y")
+        self._bind_mousewheel(tab_canvas)
+
+        frm = ttk.LabelFrame(content, text="Datos de tránsito", padding=12)
         frm.pack(fill="x")
         for c in range(8):
             frm.columnconfigure(c, weight=1 if c in (1, 5) else 0)
@@ -263,25 +275,25 @@ class App:
         ttk.Radiobutton(frm, text="Entrada por % participación", variable=self.v_class_input_mode, value="share_pct", command=self._update_traffic_mode_ui).grid(row=7, column=0, columnspan=2, sticky="w")
         ttk.Radiobutton(frm, text="Entrada por tránsito (veh/día)", variable=self.v_class_input_mode, value="count", command=self._update_traffic_mode_ui).grid(row=7, column=2, columnspan=2, sticky="w")
 
-        cls = ttk.LabelFrame(self.tab_traffic, text="Clasificación vehicular (activar/desactivar por tipo)", padding=10)
+        cls = ttk.LabelFrame(content, text="Clasificación vehicular (activar/desactivar por tipo)", padding=10)
         cls.pack(fill="both", expand=True, pady=(10, 0))
         grid_holder = ttk.Frame(cls)
         grid_holder.pack(fill="both", expand=True)
-        self.traffic_canvas = tk.Canvas(grid_holder, highlightthickness=0)
-        sc = ttk.Scrollbar(grid_holder, orient="vertical", command=self.traffic_canvas.yview)
-        table = ttk.Frame(self.traffic_canvas)
-        table.bind("<Configure>", lambda e: self.traffic_canvas.configure(scrollregion=self.traffic_canvas.bbox("all")))
-        self.traffic_canvas.create_window((0, 0), window=table, anchor="nw")
-        self.traffic_canvas.configure(yscrollcommand=sc.set)
-        self.traffic_canvas.pack(side="left", fill="both", expand=True)
+        self.traffic_table_canvas = tk.Canvas(grid_holder, highlightthickness=0)
+        sc = ttk.Scrollbar(grid_holder, orient="vertical", command=self.traffic_table_canvas.yview)
+        table = ttk.Frame(self.traffic_table_canvas)
+        table.bind("<Configure>", lambda e: self.traffic_table_canvas.configure(scrollregion=self.traffic_table_canvas.bbox("all")))
+        self.traffic_table_canvas.create_window((0, 0), window=table, anchor="nw")
+        self.traffic_table_canvas.configure(yscrollcommand=sc.set)
+        self.traffic_table_canvas.pack(side="left", fill="both", expand=True)
         sc.pack(side="right", fill="y")
-        self._bind_mousewheel(self.traffic_canvas)
+        self._bind_mousewheel(self.traffic_table_canvas)
 
         traffic_img = self._load_ui_image("traffic_banner", subsample=2)
         if traffic_img:
-            ttk.Label(self.tab_traffic, image=traffic_img).pack(anchor="e", pady=(6, 0))
+            ttk.Label(content, image=traffic_img).pack(anchor="e", pady=(6, 0))
         else:
-            ttk.Label(self.tab_traffic, text="[Imagen tipos de vehículos: sources/images/traffic_types.png]", foreground="#666").pack(anchor="e", pady=(6, 0))
+            ttk.Label(content, text="[Imagen tipos de vehículos: sources/images/traffic_types.png]", foreground="#666").pack(anchor="e", pady=(6, 0))
 
         headers = ["Usar", "Nomenclatura", "Participación %", "Tránsito (veh/día)", "EALF"]
         for i, h in enumerate(headers):
@@ -309,15 +321,15 @@ class App:
             count_v.trace_add("write", self._auto_update_aadt_from_counts)
             en.trace_add("write", self._auto_update_aadt_from_counts)
 
-        actions = ttk.Frame(self.tab_traffic)
-        actions.pack(fill="x", pady=(8,0))
+        actions = ttk.Frame(content)
+        actions.pack(fill="x", pady=(8, 0))
         ttk.Button(actions, text="Calcular ESALs", command=self.on_calculate_esals).pack(side="left")
 
         self.v_esal_warn = tk.StringVar(value="")
         ttk.Label(actions, textvariable=self.v_esal_warn, foreground="#b00020", font=("Segoe UI", 10, "bold")).pack(side="left", padx=12)
 
-        box = ttk.LabelFrame(self.tab_traffic, text="Ejes equivalentes acumulados W18", padding=10)
-        box.pack(fill="x", pady=(10,0))
+        box = ttk.LabelFrame(content, text="Ejes equivalentes acumulados W18", padding=10)
+        box.pack(fill="x", pady=(10, 0))
         self.v_w18_traffic = tk.StringVar(value="0")
         ttk.Label(box, textvariable=self.v_w18_traffic, foreground="#0b5394", font=("Segoe UI", 22, "bold")).pack(anchor="center")
 
@@ -448,11 +460,12 @@ class App:
 
         legal = []
         legal.append("AVISO LEGAL Y ACADÉMICO\n\n")
-        legal.append("Este software es meramente educativo y de apoyo académico.\n")
-        legal.append("Fue desarrollado con ayuda de una Inteligencia Artificial (IA).\n")
-        legal.append("Está hecho por y para la ESIA, en el Laboratorio de Pavimentos, ")
-        legal.append("bajo la coordinación del Ing. José Santos Arriaga Soto.\n\n")
-        legal.append("El usuario es responsable de validar cualquier resultado antes de aplicarlo en campo.\n")
+        legal.append("El presente software ha sido desarrollado exclusivamente con fines educativos, académicos y de apoyo técnico dentro de las actividades del Laboratorio de Pavimentos de la Escuela Superior de Ingeniería y Arquitectura (ESIA), Unidad Zacatenco, del Instituto Politécnico Nacional.\n\n")
+        legal.append("Su desarrollo contó con el apoyo de herramientas de Inteligencia Artificial (IA) como medio auxiliar de programación y estructuración. No obstante, los resultados generados por el sistema constituyen únicamente estimaciones basadas en los datos proporcionados por el usuario y en los modelos implementados.\n\n")
+        legal.append("El uso de esta herramienta es responsabilidad total del usuario. En ningún caso el desarrollador, el Laboratorio de Pavimentos, la ESIA, el Instituto Politécnico Nacional, ni el Ing. José Santos Arriaga Soto serán responsables por errores de cálculo, interpretaciones incorrectas, decisiones de diseño, fallas en obra o cualquier daño directo o indirecto derivado del uso del software.\n\n")
+        legal.append("Antes de su aplicación en proyectos reales, obra civil o toma de decisiones técnicas, el usuario deberá verificar, validar y, en su caso, recalcular los resultados conforme a la normativa vigente aplicable (SICT, AASHTO, ASTM u otras que correspondan).\n\n")
+        legal.append("El software se proporciona “tal cual” (AS IS), sin garantías explícitas ni implícitas de exactitud, integridad, comerciabilidad o idoneidad para un propósito particular.\n\n")
+        legal.append("El uso de este programa implica la aceptación plena de los términos aquí establecidos.\n")
 
         txt.insert("1.0", "".join(legal))
         txt.configure(state="disabled")
