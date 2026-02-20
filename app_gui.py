@@ -56,7 +56,6 @@ class App:
                 "growth_pct": 3.0,
                 "apply_growth": True,
                 "design_years": 20,
-                "use_detailed_tf": True,
                 "class_input_mode": "share_pct",
                 "truck_classes": [
                     {"name": "A", "share_pct": 25.0, "count": 2500.0, "ealf": 0.05, "enabled": True},
@@ -163,18 +162,26 @@ class App:
         self.v_years = tk.StringVar()
         ttk.Entry(frm, textvariable=self.v_years).grid(row=5, column=1, sticky="ew")
 
-        self.v_use_detailed = tk.BooleanVar()
-        ttk.Checkbutton(frm, text="Usar TF detallado por tipo de vehículo", variable=self.v_use_detailed).grid(row=6, column=0, columnspan=4, sticky="w")
-
         self.v_class_input_mode = tk.StringVar(value="share_pct")
         ttk.Radiobutton(frm, text="Entrada por % participación", variable=self.v_class_input_mode, value="share_pct", command=self._update_traffic_mode_ui).grid(row=7, column=0, columnspan=2, sticky="w")
         ttk.Radiobutton(frm, text="Entrada por tránsito (veh/día)", variable=self.v_class_input_mode, value="count", command=self._update_traffic_mode_ui).grid(row=7, column=2, columnspan=2, sticky="w")
 
         cls = ttk.LabelFrame(self.tab_traffic, text="Clasificación vehicular (activar/desactivar por tipo)", padding=10)
         cls.pack(fill="both", expand=True, pady=(10, 0))
+        grid_holder = ttk.Frame(cls)
+        grid_holder.pack(fill="both", expand=True)
+        canvas = tk.Canvas(grid_holder, highlightthickness=0)
+        sc = ttk.Scrollbar(grid_holder, orient="vertical", command=canvas.yview)
+        table = ttk.Frame(canvas)
+        table.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+        canvas.create_window((0, 0), window=table, anchor="nw")
+        canvas.configure(yscrollcommand=sc.set)
+        canvas.pack(side="left", fill="both", expand=True)
+        sc.pack(side="right", fill="y")
+
         headers = ["Usar", "Nomenclatura", "Participación %", "Tránsito (veh/día)", "EALF"]
         for i, h in enumerate(headers):
-            ttk.Label(cls, text=h).grid(row=0, column=i, sticky="w")
+            ttk.Label(table, text=h).grid(row=0, column=i, sticky="w")
 
         self.class_rows = []
         self.share_entries = []
@@ -185,13 +192,13 @@ class App:
             share_v = tk.StringVar()
             count_v = tk.StringVar()
             ealf_v = tk.StringVar()
-            ttk.Checkbutton(cls, variable=en).grid(row=i + 1, column=0, sticky="w")
-            ttk.Entry(cls, textvariable=name_v, width=12).grid(row=i + 1, column=1, sticky="ew", padx=2, pady=2)
-            e_share = ttk.Entry(cls, textvariable=share_v, width=10)
+            ttk.Checkbutton(table, variable=en).grid(row=i + 1, column=0, sticky="w")
+            ttk.Entry(table, textvariable=name_v, width=12).grid(row=i + 1, column=1, sticky="ew", padx=2, pady=2)
+            e_share = ttk.Entry(table, textvariable=share_v, width=10)
             e_share.grid(row=i + 1, column=2, sticky="ew", padx=2, pady=2)
-            e_count = ttk.Entry(cls, textvariable=count_v, width=12)
+            e_count = ttk.Entry(table, textvariable=count_v, width=12)
             e_count.grid(row=i + 1, column=3, sticky="ew", padx=2, pady=2)
-            ttk.Entry(cls, textvariable=ealf_v, width=10).grid(row=i + 1, column=4, sticky="ew", padx=2, pady=2)
+            ttk.Entry(table, textvariable=ealf_v, width=10).grid(row=i + 1, column=4, sticky="ew", padx=2, pady=2)
             self.class_rows.append((en, name_v, share_v, count_v, ealf_v))
             self.share_entries.append(e_share)
             self.count_entries.append(e_count)
@@ -250,13 +257,23 @@ class App:
         top.pack(fill="x", pady=(0,8))
         self.v_w18_big = tk.StringVar(value="0")
         ttk.Label(top, textvariable=self.v_w18_big, foreground="#0b5394", font=("Segoe UI", 24, "bold")).pack(anchor="center")
-        self.txt = tk.Text(self.tab_results, height=24, wrap="word")
-        self.txt.pack(fill="both", expand=True)
+        body = ttk.Frame(self.tab_results)
+        body.pack(fill="both", expand=True)
+        self.txt = tk.Text(body, height=24, wrap="word")
+        sc = ttk.Scrollbar(body, orient="vertical", command=self.txt.yview)
+        self.txt.configure(yscrollcommand=sc.set)
+        self.txt.pack(side="left", fill="both", expand=True)
+        sc.pack(side="right", fill="y")
         self.txt.configure(state="disabled")
 
     def _build_tab_calculos(self):
-        self.txt_calc = tk.Text(self.tab_calculos, height=30, wrap="word")
-        self.txt_calc.pack(fill="both", expand=True)
+        body = ttk.Frame(self.tab_calculos)
+        body.pack(fill="both", expand=True)
+        self.txt_calc = tk.Text(body, height=30, wrap="word")
+        sc = ttk.Scrollbar(body, orient="vertical", command=self.txt_calc.yview)
+        self.txt_calc.configure(yscrollcommand=sc.set)
+        self.txt_calc.pack(side="left", fill="both", expand=True)
+        sc.pack(side="right", fill="y")
         self.txt_calc.configure(state="disabled")
 
 
@@ -285,8 +302,13 @@ class App:
         btnf.pack(fill="x", pady=(8,0))
         ttk.Button(btnf, text="Calcular costos", command=self.on_calculate_costs).pack(side="left")
 
-        self.txt_cost = tk.Text(self.tab_costs, height=16, wrap="word")
-        self.txt_cost.pack(fill="both", expand=True, pady=(10, 0))
+        body = ttk.Frame(self.tab_costs)
+        body.pack(fill="both", expand=True, pady=(10, 0))
+        self.txt_cost = tk.Text(body, height=16, wrap="word")
+        sc = ttk.Scrollbar(body, orient="vertical", command=self.txt_cost.yview)
+        self.txt_cost.configure(yscrollcommand=sc.set)
+        self.txt_cost.pack(side="left", fill="both", expand=True)
+        sc.pack(side="right", fill="y")
         self.txt_cost.configure(state="disabled")
 
     def _build_tab_section(self):
@@ -304,7 +326,7 @@ class App:
     def _load_to_form(self):
         t = self.data["traffic"]; a = self.data["aashto"]; l = self.data["layers"]
         self.v_aadt.set(str(t["aadt_total"])); self.v_dd.set(str(t["dd"])); self.v_dl.set(str(t["dl"]))
-        self.v_growth.set(str(t["growth_pct"])); self.v_apply_growth.set(bool(t.get("apply_growth", True))); self.v_years.set(str(t["design_years"])); self.v_use_detailed.set(bool(t.get("use_detailed_tf", True))); self.v_class_input_mode.set(t.get("class_input_mode", "share_pct"))
+        self.v_growth.set(str(t["growth_pct"])); self.v_apply_growth.set(bool(t.get("apply_growth", True))); self.v_years.set(str(t["design_years"])); self.v_class_input_mode.set(t.get("class_input_mode", "share_pct"))
         for idx, row in enumerate(t.get("truck_classes", [])):
             if idx < len(self.class_rows):
                 en, n, s_v, c_v, e = self.class_rows[idx]
@@ -319,7 +341,7 @@ class App:
     def _read_form_to_data(self):
         t = self.data["traffic"]; a = self.data["aashto"]; l = self.data["layers"]
         t["aadt_total"] = float(self.v_aadt.get()); t["pct_trucks"] = 100.0; t["dd"] = float(self.v_dd.get()); t["dl"] = float(self.v_dl.get())
-        t["growth_pct"] = float(self.v_growth.get()); t["apply_growth"] = bool(self.v_apply_growth.get()); t["design_years"] = int(float(self.v_years.get())); t["use_detailed_tf"] = True; t["class_input_mode"] = self.v_class_input_mode.get()
+        t["growth_pct"] = float(self.v_growth.get()); t["apply_growth"] = bool(self.v_apply_growth.get()); t["design_years"] = int(float(self.v_years.get())); t["class_input_mode"] = self.v_class_input_mode.get()
         classes = []
         for en, n, s_v, c_v, e in self.class_rows:
             if n.get().strip() or s_v.get().strip() or c_v.get().strip() or e.get().strip():
@@ -588,13 +610,14 @@ class App:
             out = []
             out.append("RESULTADOS AASHTO 1993\n\n")
             out.append("Metodología ESAL usada:\n")
+            out.append("- Si aplica crecimiento: r = crecimiento(%) / 100 y B = ((1+r)^n - 1) / r.\n")
+            out.append("- Si NO aplica crecimiento: B = n.\n")
             if t.get("class_input_mode") == "count":
-                out.append("- ESAL diario = Σ(Tránsito_i * EALF_i).\n")
-                out.append("- W18 = 365 * ESAL_diario * DD * DL * factor_crecimiento.\n\n")
+                out.append("- ADT_i = Tránsito_i capturado (veh/día).\n")
             else:
-                out.append("- TF = Σ(%Participación_i * EALF_i).\n")
-                out.append("- ESAL diario = TPDA * TF.\n")
-                out.append("- W18 = 365 * ESAL_diario * DD * DL * factor_crecimiento.\n\n")
+                out.append("- ADT_i = TPDA * (%Participación_i/100).\n")
+            out.append("- ESAL_i = ADT_i * EALF_i * 365 * B.\n")
+            out.append("- W18 = ΣESAL_i * DD * DL.\n\n")
             out.append(f"W18 acumulado: {w18:,.0f}\n")
             out.append(f"Factor B: {esal_detail['B']:.6f} | ΣESAL: {esal_detail['sum_esal']:,.2f}\n\n")
             out.append(f"SN3 objetivo (usuario): {fnum(sn3_target,3)}\n")
