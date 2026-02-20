@@ -39,7 +39,7 @@ VALIDATION_FIELDS = [
 class App:
     def __init__(self):
         self.root = tk.Tk()
-        self.root.title("AASHTO 1993 Flexible - Diseñador de Pavimentos")
+        self.root.title("Calculadora de Espesores de Pavimento Flexible por el método AASHTO")
         self.root.geometry("1240x820")
         self.root.minsize(1100, 720)
         self.data = self.default_data()
@@ -54,7 +54,6 @@ class App:
                 "dd": 0.50,
                 "dl": 0.90,
                 "growth_pct": 3.0,
-                "apply_growth": True,
                 "design_years": 20,
                 "class_input_mode": "share_pct",
                 "truck_classes": [
@@ -101,7 +100,7 @@ class App:
 
         top = ttk.Frame(self.root, padding=10)
         top.pack(fill="x")
-        ttk.Label(top, text="AASHTO 1993 Flexible Pavement Designer", style="Title.TLabel").pack(side="left")
+        ttk.Label(top, text="Calculadora de Espesores de Pavimento Flexible por el método AASHTO", style="Title.TLabel").pack(side="left")
 
         btns = ttk.Frame(top)
         btns.pack(side="right")
@@ -153,10 +152,11 @@ class App:
         self.e_aadt = frm.grid_slaves(row=0, column=1)[0]
         self.v_dd = self._entry_with_help(frm, 1, "DD", "dd")
         self.v_dl = self._entry_with_help(frm, 2, "DL", "dl")
-        self.v_growth = self._entry_with_help(frm, 3, "Crecimiento", "growth", "%")
-
-        self.v_apply_growth = tk.BooleanVar(value=True)
-        ttk.Checkbutton(frm, text="Aplicar crecimiento del tránsito", variable=self.v_apply_growth).grid(row=4, column=0, columnspan=4, sticky="w")
+        ttk.Label(frm, text="Crecimiento anual").grid(row=3, column=0, sticky="w", pady=3)
+        self.v_growth = tk.StringVar(value="0.00")
+        ttk.Label(frm, textvariable=self.v_growth, foreground="#0b5394", font=("Segoe UI", 10, "bold")).grid(row=3, column=1, sticky="w", pady=3)
+        ttk.Label(frm, text="%").grid(row=3, column=2, sticky="w", padx=(6, 2))
+        ttk.Button(frm, text="Definir crecimiento", command=self.on_growth_dialog).grid(row=3, column=3, sticky="w")
 
         ttk.Label(frm, text="Años de diseño").grid(row=5, column=0, sticky="w")
         self.v_years = tk.StringVar()
@@ -326,7 +326,7 @@ class App:
     def _load_to_form(self):
         t = self.data["traffic"]; a = self.data["aashto"]; l = self.data["layers"]
         self.v_aadt.set(str(t["aadt_total"])); self.v_dd.set(str(t["dd"])); self.v_dl.set(str(t["dl"]))
-        self.v_growth.set(str(t["growth_pct"])); self.v_apply_growth.set(bool(t.get("apply_growth", True))); self.v_years.set(str(t["design_years"])); self.v_class_input_mode.set(t.get("class_input_mode", "share_pct"))
+        self.v_growth.set(f"{float(t['growth_pct']):.4f}"); self.v_years.set(str(t["design_years"])); self.v_class_input_mode.set(t.get("class_input_mode", "share_pct"))
         for idx, row in enumerate(t.get("truck_classes", [])):
             if idx < len(self.class_rows):
                 en, n, s_v, c_v, e = self.class_rows[idx]
@@ -341,7 +341,7 @@ class App:
     def _read_form_to_data(self):
         t = self.data["traffic"]; a = self.data["aashto"]; l = self.data["layers"]
         t["aadt_total"] = float(self.v_aadt.get()); t["pct_trucks"] = 100.0; t["dd"] = float(self.v_dd.get()); t["dl"] = float(self.v_dl.get())
-        t["growth_pct"] = float(self.v_growth.get()); t["apply_growth"] = bool(self.v_apply_growth.get()); t["design_years"] = int(float(self.v_years.get())); t["class_input_mode"] = self.v_class_input_mode.get()
+        t["growth_pct"] = float(self.v_growth.get()); t["design_years"] = int(float(self.v_years.get())); t["class_input_mode"] = self.v_class_input_mode.get()
         classes = []
         for en, n, s_v, c_v, e in self.class_rows:
             if n.get().strip() or s_v.get().strip() or c_v.get().strip() or e.get().strip():
@@ -386,8 +386,8 @@ class App:
 
     def _validate_ranges(self):
         t = self.data["traffic"]; a = self.data["aashto"]; v = self.data["validation"]
-        if t.get("apply_growth", True) and t["growth_pct"] < 0:
-            raise ValueError("Si aplicas crecimiento, la tasa debe ser >= 0")
+        if t["growth_pct"] < 0:
+            raise ValueError("La tasa de crecimiento debe ser >= 0")
 
         checks = [
             ("TPDA", t["aadt_total"], v["aadt_min"], v["aadt_max"], "Ajusta TPDA o cambia rango en Opciones."),
@@ -403,6 +403,70 @@ class App:
 
     def show_help(self, key):
         messagebox.showinfo("Ayuda", HELP_TEXTS.get(key, "Ayuda no disponible."))
+
+    def on_growth_dialog(self):
+        win = tk.Toplevel(self.root)
+        win.title("Definir crecimiento")
+        win.geometry("620x320")
+        win.transient(self.root)
+        win.grab_set()
+
+        ttk.Label(
+            win,
+            text=(
+                "Si tienes el factor de crecimiento ingrésalo manualmente. "
+                "Si no, calcula con TA (tránsito año actual), TP (tránsito año previo) y N (años entre aforos)."
+            ),
+            wraplength=580,
+            justify="left",
+        ).pack(anchor="w", padx=12, pady=(12, 8))
+
+        mode = tk.StringVar(value="manual")
+        frm = ttk.Frame(win, padding=12)
+        frm.pack(fill="both", expand=True)
+
+        manual_pct = tk.StringVar(value=self.v_growth.get() or "0")
+        ta_v = tk.StringVar(value="")
+        tp_v = tk.StringVar(value="")
+        n_v = tk.StringVar(value="")
+        calc_result = tk.StringVar(value="")
+
+        ttk.Radiobutton(frm, text="Ingresar porcentaje manual", variable=mode, value="manual").grid(row=0, column=0, sticky="w")
+        ttk.Entry(frm, textvariable=manual_pct, width=12).grid(row=0, column=1, sticky="w", padx=(8, 4))
+        ttk.Label(frm, text="%").grid(row=0, column=2, sticky="w")
+
+        ttk.Radiobutton(frm, text="Calcular con aforos", variable=mode, value="formula").grid(row=1, column=0, sticky="w", pady=(12, 4))
+        ttk.Label(frm, text="TA").grid(row=2, column=0, sticky="w")
+        ttk.Entry(frm, textvariable=ta_v, width=16).grid(row=2, column=1, sticky="w")
+        ttk.Label(frm, text="TP").grid(row=3, column=0, sticky="w")
+        ttk.Entry(frm, textvariable=tp_v, width=16).grid(row=3, column=1, sticky="w")
+        ttk.Label(frm, text="N").grid(row=4, column=0, sticky="w")
+        ttk.Entry(frm, textvariable=n_v, width=16).grid(row=4, column=1, sticky="w")
+        ttk.Label(frm, text="r=(TA/TP)^(1/N) y crecimiento(%)=(r-1)*100", foreground="#444").grid(row=5, column=0, columnspan=3, sticky="w", pady=(4, 0))
+        ttk.Label(frm, textvariable=calc_result, foreground="#0b5394").grid(row=6, column=0, columnspan=3, sticky="w", pady=(4, 0))
+
+        def apply_growth_value():
+            try:
+                if mode.get() == "manual":
+                    g = float(manual_pct.get())
+                else:
+                    ta = float(ta_v.get())
+                    tp = float(tp_v.get())
+                    n = float(n_v.get())
+                    if ta <= 0 or tp <= 0 or n <= 0:
+                        raise ValueError("TA, TP y N deben ser > 0")
+                    r = (ta / tp) ** (1.0 / n)
+                    g = (r - 1.0) * 100.0
+                    calc_result.set(f"r = {r:.6f} | crecimiento = {g:.4f}%")
+                self.v_growth.set(f"{g:.4f}")
+                win.destroy()
+            except Exception as e:
+                messagebox.showerror("Crecimiento", f"No se pudo guardar el crecimiento\n{e}")
+
+        btns = ttk.Frame(win, padding=12)
+        btns.pack(fill="x")
+        ttk.Button(btns, text="Guardar", command=apply_growth_value).pack(side="right")
+        ttk.Button(btns, text="Cancelar", command=win.destroy).pack(side="right", padx=8)
 
     def on_options(self):
         win = tk.Toplevel(self.root)
@@ -515,7 +579,6 @@ class App:
             tpda_total=t["aadt_total"],
             dd=t["dd"],
             dl=t["dl"],
-            apply_growth=bool(t.get("apply_growth", True)),
             growth_pct=t["growth_pct"],
             years=t["design_years"],
         )
@@ -610,8 +673,7 @@ class App:
             out = []
             out.append("RESULTADOS AASHTO 1993\n\n")
             out.append("Metodología ESAL usada:\n")
-            out.append("- Si aplica crecimiento: r = crecimiento(%) / 100 y B = ((1+r)^n - 1) / r.\n")
-            out.append("- Si NO aplica crecimiento: B = n.\n")
+            out.append("- r = crecimiento(%) / 100 y B = ((1+r)^n - 1) / r.\n")
             if t.get("class_input_mode") == "count":
                 out.append("- ADT_i = Tránsito_i capturado (veh/día).\n")
             else:
@@ -737,14 +799,14 @@ class App:
             y = page_h - 36
 
             c.setFont("Helvetica-Bold", 13)
-            c.drawString(36, y, "Reporte de Diseño - AASHTO 1993 Flexible")
+            c.drawString(36, y, "Reporte - Calculadora de Espesores por método AASHTO")
             y -= 22
             c.setFont("Helvetica", 9)
 
             data_lines = [
                 f"Proyecto: {self.data.get('project', {}).get('name', 'N/A')}",
                 f"TPDA: {t['aadt_total']:.2f} | DD: {t['dd']:.3f} | DL: {t['dl']:.3f}",
-                f"Crecimiento: {t['growth_pct']:.2f}% | Aplicar crecimiento: {t.get('apply_growth', True)} | Años: {t['design_years']}",
+                f"Crecimiento: {t['growth_pct']:.4f}% | Años: {t['design_years']}",
                 f"R: {a['reliability_pct']:.2f} | So: {a['so']:.3f} | Pi: {a['pi']:.3f} | Pt: {a['pt']:.3f} | Mr(MPa): {a['mr_mpa']:.3f}",
                 f"a1:{l['a1']:.3f} a2:{l['a2']:.3f} a3:{l['a3']:.3f} m2:{l['m2']:.3f} m3:{l['m3']:.3f}",
                 f"SN1:{l['sn1_target']:.3f} SN2:{l['sn2_target']:.3f} SN3_obj:{l['sn3_target']:.3f} SN3_ref:{rs['SN3_aashto']:.3f}",

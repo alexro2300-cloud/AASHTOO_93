@@ -20,7 +20,6 @@ def compute_esals_detailed(
     tpda_total: float,
     dd: float,
     dl: float,
-    apply_growth: bool,
     growth_pct: float,
     years: int,
 ) -> dict:
@@ -40,19 +39,16 @@ def compute_esals_detailed(
         raise ValueError("TPDA total > 0")
     if dd < 0 or dl < 0:
         raise ValueError("DD y DL deben ser >= 0")
-    if apply_growth and growth_pct < 0:
-        raise ValueError("Si aplicas crecimiento, la tasa debe ser >= 0")
+    if growth_pct < 0:
+        raise ValueError("La tasa de crecimiento debe ser >= 0")
     if not vehicle_classes:
         raise ValueError("Debes capturar al menos una clase vehicular")
 
-    if apply_growth:
-        r = growth_pct / 100.0
-        if abs(r) < 1e-12:
-            b = float(years)
-        else:
-            b = ((1 + r) ** years - 1.0) / r
-    else:
+    r = growth_pct / 100.0
+    if abs(r) < 1e-12:
         b = float(years)
+    else:
+        b = ((1 + r) ** years - 1.0) / r
 
     enabled_rows = [row for row in vehicle_classes if bool(row.get("enabled", True))]
     if not enabled_rows:
