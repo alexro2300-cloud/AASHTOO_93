@@ -144,15 +144,17 @@ class App:
             justify="center",
         ).grid(row=0, column=1, sticky="ew")
 
-        actions_btn = ttk.Menubutton(top, text="Acciones")
-        actions_btn.grid(row=0, column=2, sticky="e")
+        actions = ttk.Frame(top)
+        actions.grid(row=0, column=2, sticky="e")
+        ttk.Button(actions, text="Calcular", command=self.on_calculate).pack(side="left", padx=(0, 8))
+        actions_btn = ttk.Menubutton(actions, text="Acciones")
+        actions_btn.pack(side="left")
         actions_menu = tk.Menu(actions_btn, tearoff=False)
         for txt, cmd in [
             ("Nuevo", self.on_new),
             ("Abrir", self.on_open),
             ("Guardar", self.on_save),
             ("Opciones", self.on_options),
-            ("Calcular", self.on_calculate),
             ("PDF", self.on_export_pdf),
         ]:
             actions_menu.add_command(label=txt, command=cmd)
@@ -512,18 +514,22 @@ class App:
     def _auto_update_aadt_from_counts(self, *_):
         if getattr(self, "v_class_input_mode", None) is None:
             return
-        if self.v_class_input_mode.get() != "count":
-            return
+
         total = 0.0
-        for en, _, _, c_v, _ in self.class_rows:
+        is_count = self.v_class_input_mode.get() == "count"
+        for en, _, _, c_v, e_v in self.class_rows:
             if not en.get():
                 c_v.set("0")
+                e_v.set("0")
                 continue
-            try:
-                total += float(c_v.get() or 0)
-            except Exception:
-                pass
-        self.v_aadt.set(f"{total:.2f}")
+            if is_count:
+                try:
+                    total += float(c_v.get() or 0)
+                except Exception:
+                    pass
+
+        if is_count:
+            self.v_aadt.set(f"{total:.2f}")
 
     def _update_traffic_mode_ui(self):
         mode = self.v_class_input_mode.get()
@@ -774,7 +780,7 @@ class App:
         lines.append("Tipo            ADT_i          EALF            ESAL_i\n")
         lines.append("-" * 62 + "\n")
         for r in esal_detail.get("rows", []):
-            lines.append(f"{r['name']:<12}{r['ADT_i']:>12.4f}{r['ealf']:>14.4f}{r['ESAL_i']:>24.4f}\n")
+            lines.append(f"{r['name']:<12}{r['ADT_i']:>12,.4f}{r['ealf']:>14,.4f}{r['ESAL_i']:>24,.4f}\n")
         lines.append("\n3) Fórmulas usadas\n")
         lines.append("- ADT_i (modo %): TPDA * (%Participación_i/100).\n")
         lines.append("- ADT_i (modo tránsito): Tránsito_i capturado.\n")
@@ -877,29 +883,29 @@ class App:
         lines = []
         lines.append("DESGLOSE DE CÁLCULOS\n\n")
         lines.append("A) ESPESORES CALCULADOS\n")
-        lines.append(f"D1 = SN1/A1 = {calc['SN1_target']:.3f}/{l['a1']:.3f} = {calc['D1_raw_in']:.3f} in\n")
-        lines.append(f"D1 redondeado (0.5 más cercana) = {calc['D1_in']:.2f} in\n")
-        lines.append(f"SN1* = D1red*A1 = {calc['D1_in']:.2f}*{l['a1']:.3f} = {calc['SN1_star']:.3f}\n\n")
-        lines.append(f"D2 = (SN2-SN1*)/(A2*M2) = ({calc['SN2_target']:.3f}-{calc['SN1_star']:.3f})/({l['a2']:.3f}*{l['m2']:.3f}) = {calc['D2_raw_in']:.3f} in\n")
-        lines.append(f"D2 redondeado (0.5 hacia arriba) = {calc['D2_in']:.2f} in\n")
-        lines.append(f"SN2* = D2red*A2*M2 = {calc['D2_in']:.2f}*{l['a2']:.3f}*{l['m2']:.3f} = {calc['SN2_star']:.3f}\n\n")
-        lines.append(f"D3 = (SN3-(SN1*+SN2*))/(A3*M3) = ({sn3:.3f}-({calc['SN1_star']:.3f}+{calc['SN2_star']:.3f}))/({l['a3']:.3f}*{l['m3']:.3f}) = {calc['D3_raw_in']:.3f} in\n")
-        lines.append(f"D3 redondeado (0.5 hacia arriba) = {calc['D3_in']:.2f} in\n")
-        lines.append(f"SN3* = D3red*A3*M3 = {calc['D3_in']:.2f}*{l['a3']:.3f}*{l['m3']:.3f} = {calc['SN3_star']:.3f}\n")
-        lines.append(f"Comprobación suma: SN1*+SN2*+SN3* = {calc['SN_sum']:.3f}\n")
+        lines.append(f"D1 = SN1/A1 = {calc['SN1_target']:,.3f}/{l['a1']:,.3f} = {calc['D1_raw_in']:,.3f} in\n")
+        lines.append(f"D1 redondeado (0.5 más cercana) = {calc['D1_in']:,.2f} in\n")
+        lines.append(f"SN1* = D1red*A1 = {calc['D1_in']:,.2f}*{l['a1']:,.3f} = {calc['SN1_star']:,.3f}\n\n")
+        lines.append(f"D2 = (SN2-SN1*)/(A2*M2) = ({calc['SN2_target']:,.3f}-{calc['SN1_star']:,.3f})/({l['a2']:,.3f}*{l['m2']:,.3f}) = {calc['D2_raw_in']:,.3f} in\n")
+        lines.append(f"D2 redondeado (0.5 hacia arriba) = {calc['D2_in']:,.2f} in\n")
+        lines.append(f"SN2* = D2red*A2*M2 = {calc['D2_in']:,.2f}*{l['a2']:,.3f}*{l['m2']:,.3f} = {calc['SN2_star']:,.3f}\n\n")
+        lines.append(f"D3 = (SN3-(SN1*+SN2*))/(A3*M3) = ({sn3:,.3f}-({calc['SN1_star']:,.3f}+{calc['SN2_star']:,.3f}))/({l['a3']:,.3f}*{l['m3']:,.3f}) = {calc['D3_raw_in']:,.3f} in\n")
+        lines.append(f"D3 redondeado (0.5 hacia arriba) = {calc['D3_in']:,.2f} in\n")
+        lines.append(f"SN3* = D3red*A3*M3 = {calc['D3_in']:,.2f}*{l['a3']:,.3f}*{l['m3']:,.3f} = {calc['SN3_star']:,.3f}\n")
+        lines.append(f"Comprobación suma: SN1*+SN2*+SN3* = {calc['SN_sum']:,.3f}\n")
         lines.append("\n")
-        lines.append(f"Criterio estructural (>=SN3): {calc['SN_sum']:.3f} >= {sn3:.3f} -> {calc['criterion_meets_or_exceeds']}\n\n")
+        lines.append(f"Criterio estructural (>=SN3): {calc['SN_sum']:,.3f} >= {sn3:,.3f} -> {calc['criterion_meets_or_exceeds']}\n\n")
 
         lines.append("B) AJUSTE CON MÍNIMOS\n")
         lines.append(f"Tabla 7-2 aplicada: {mins['minimum_table']['range_label']}\n")
-        lines.append(f"D1 ajustado = D1_min(opciones) = {mins['minimum_table']['D1_min_in']:.2f} in -> {mins['D1_in']:.2f} in\n")
-        lines.append(f"D2 ajustado = D2_min(opciones) = {mins['minimum_table']['D2_min_in']:.2f} in -> {mins['D2_in']:.2f} in\n")
-        lines.append(f"SN1*min = D1_adj*A1 = {mins['SN1_star']:.3f}\n")
-        lines.append(f"SN2*min = D2_adj*A2*M2 = {mins['SN2_star']:.3f}\n")
-        lines.append(f"D3_min = (SN3-(SN1*min+SN2*min))/(A3*M3) = {mins['D3_raw_in']:.3f} in\n")
-        lines.append(f"D3 redondeado (0.5 hacia arriba) = {mins['D3_in']:.2f} in\n")
-        lines.append(f"SN3*min = {mins['SN3_star']:.3f}\n")
-        lines.append(f"Comprobación suma mínima: {mins['SN_sum']:.3f}\n")
+        lines.append(f"D1 ajustado = D1_min(opciones) = {mins['minimum_table']['D1_min_in']:,.2f} in -> {mins['D1_in']:,.2f} in\n")
+        lines.append(f"D2 ajustado = D2_min(opciones) = {mins['minimum_table']['D2_min_in']:,.2f} in -> {mins['D2_in']:,.2f} in\n")
+        lines.append(f"SN1*min = D1_adj*A1 = {mins['SN1_star']:,.3f}\n")
+        lines.append(f"SN2*min = D2_adj*A2*M2 = {mins['SN2_star']:,.3f}\n")
+        lines.append(f"D3_min = (SN3-(SN1*min+SN2*min))/(A3*M3) = {mins['D3_raw_in']:,.3f} in\n")
+        lines.append(f"D3 redondeado (0.5 hacia arriba) = {mins['D3_in']:,.2f} in\n")
+        lines.append(f"SN3*min = {mins['SN3_star']:,.3f}\n")
+        lines.append(f"Comprobación suma mínima: {mins['SN_sum']:,.3f}\n")
         return "".join(lines)
 
 
@@ -907,20 +913,20 @@ class App:
         c = self.data["prelim_costs"]
         lines = []
         lines.append("COSTOS PRELIMINARES POR KILÓMETRO\n\n")
-        lines.append(f"Ancho de corona: {costs['width_m']:.2f} m\n")
-        lines.append(f"Costo carpeta: {c['cost_d1']:.2f} $/m³ | base: {c['cost_d2']:.2f} $/m³ | subbase: {c['cost_d3']:.2f} $/m³\n\n")
+        lines.append(f"Ancho de corona: {costs['width_m']:,.2f} m\n")
+        lines.append(f"Costo carpeta: {c['cost_d1']:,.2f} $/m³ | base: {c['cost_d2']:,.2f} $/m³ | subbase: {c['cost_d3']:,.2f} $/m³\n\n")
 
         lines.append("1) Solución calculada\n")
-        lines.append(f"- Carpeta: Vol {costs['calculated']['vol_d1']:.2f} m³/km | Costo {costs['calculated']['cost_d1']:.2f} $/km\n")
-        lines.append(f"- Base: Vol {costs['calculated']['vol_d2']:.2f} m³/km | Costo {costs['calculated']['cost_d2']:.2f} $/km\n")
-        lines.append(f"- Subbase: Vol {costs['calculated']['vol_d3']:.2f} m³/km | Costo {costs['calculated']['cost_d3']:.2f} $/km\n")
-        lines.append(f"- Costo total: {costs['calculated']['total']:.2f} $/km\n\n")
+        lines.append(f"- Carpeta: Vol {costs['calculated']['vol_d1']:,.2f} m³/km | Costo {costs['calculated']['cost_d1']:,.2f} $/km\n")
+        lines.append(f"- Base: Vol {costs['calculated']['vol_d2']:,.2f} m³/km | Costo {costs['calculated']['cost_d2']:,.2f} $/km\n")
+        lines.append(f"- Subbase: Vol {costs['calculated']['vol_d3']:,.2f} m³/km | Costo {costs['calculated']['cost_d3']:,.2f} $/km\n")
+        lines.append(f"- Costo total: {costs['calculated']['total']:,.2f} $/km\n\n")
 
         lines.append("2) Solución con mínimos\n")
-        lines.append(f"- Carpeta: Vol {costs['minimums']['vol_d1']:.2f} m³/km | Costo {costs['minimums']['cost_d1']:.2f} $/km\n")
-        lines.append(f"- Base: Vol {costs['minimums']['vol_d2']:.2f} m³/km | Costo {costs['minimums']['cost_d2']:.2f} $/km\n")
-        lines.append(f"- Subbase: Vol {costs['minimums']['vol_d3']:.2f} m³/km | Costo {costs['minimums']['cost_d3']:.2f} $/km\n")
-        lines.append(f"- Costo total: {costs['minimums']['total']:.2f} $/km\n")
+        lines.append(f"- Carpeta: Vol {costs['minimums']['vol_d1']:,.2f} m³/km | Costo {costs['minimums']['cost_d1']:,.2f} $/km\n")
+        lines.append(f"- Base: Vol {costs['minimums']['vol_d2']:,.2f} m³/km | Costo {costs['minimums']['cost_d2']:,.2f} $/km\n")
+        lines.append(f"- Subbase: Vol {costs['minimums']['vol_d3']:,.2f} m³/km | Costo {costs['minimums']['cost_d3']:,.2f} $/km\n")
+        lines.append(f"- Costo total: {costs['minimums']['total']:,.2f} $/km\n")
         return "".join(lines)
 
     def _draw_one_section(self, canvas, d1, d2, d3):
@@ -973,7 +979,7 @@ class App:
                 f"TPDA: {t['aadt_total']:.2f} | DD: {t['dd']:.3f} | DL: {t['dl']:.3f}",
                 f"Crecimiento: {t['growth_pct']:.4f}% | Años: {t['design_years']}",
                 f"R: {a['reliability_pct']:.2f} | So: {a['so']:.3f} | Pi: {a['pi']:.3f} | Pt: {a['pt']:.3f} | Mr(MPa): {a['mr_mpa']:.3f}",
-                f"a1:{l['a1']:.3f} a2:{l['a2']:.3f} a3:{l['a3']:.3f} m2:{l['m2']:.3f} m3:{l['m3']:.3f}",
+                f"a1:{l['a1']:,.3f} a2:{l['a2']:,.3f} a3:{l['a3']:,.3f} m2:{l['m2']:,.3f} m3:{l['m3']:,.3f}",
                 f"SN1:{l['sn1_target']:.3f} SN2:{l['sn2_target']:.3f} SN3_obj:{l['sn3_target']:.3f} SN3_ref:{rs['SN3_aashto']:.3f}",
                 f"W18: {rs['W18']:,.0f}",
                 f"Costo calculada: {costs.get('calculated', {}).get('total', 0.0):.2f} $/km",
