@@ -114,23 +114,26 @@ class App:
         self.tab_aashto = ttk.Frame(self.nb, padding=12)
         self.tab_layers = ttk.Frame(self.nb, padding=12)
         self.tab_results = ttk.Frame(self.nb, padding=12)
-        self.tab_calculos = ttk.Frame(self.nb, padding=12)
+        self.tab_calc_esals = ttk.Frame(self.nb, padding=12)
+        self.tab_calc_thickness = ttk.Frame(self.nb, padding=12)
         self.tab_costs = ttk.Frame(self.nb, padding=12)
         self.tab_section = ttk.Frame(self.nb, padding=12)
 
         self.nb.add(self.tab_traffic, text="Tránsito / ESALs")
+        self.nb.add(self.tab_calc_esals, text="Cálculos ESALs")
         self.nb.add(self.tab_aashto, text="Parámetros AASHTO")
         self.nb.add(self.tab_layers, text="Capas / Espesores")
+        self.nb.add(self.tab_calc_thickness, text="Cálculos Espesores")
         self.nb.add(self.tab_results, text="Resultados")
-        self.nb.add(self.tab_calculos, text="Cálculos")
         self.nb.add(self.tab_costs, text="Costos preliminares")
         self.nb.add(self.tab_section, text="Sección de Pavimento")
 
         self._build_tab_traffic()
+        self._build_tab_calc_esals()
         self._build_tab_aashto()
         self._build_tab_layers()
+        self._build_tab_calc_thickness()
         self._build_tab_results()
-        self._build_tab_calculos()
         self._build_tab_costs()
         self._build_tab_section()
         self._load_to_form()
@@ -252,8 +255,28 @@ class App:
 
         ttk.Label(self.tab_layers, text="SN1, SN2 y SN3 objetivo son ingresados por el usuario para el método secuencial.", foreground="#444").pack(anchor="w", pady=(8, 0))
 
+    def _build_tab_calc_esals(self):
+        body = ttk.Frame(self.tab_calc_esals)
+        body.pack(fill="both", expand=True)
+        self.txt_calc_esals = tk.Text(body, height=30, wrap="word")
+        sc = ttk.Scrollbar(body, orient="vertical", command=self.txt_calc_esals.yview)
+        self.txt_calc_esals.configure(yscrollcommand=sc.set)
+        self.txt_calc_esals.pack(side="left", fill="both", expand=True)
+        sc.pack(side="right", fill="y")
+        self.txt_calc_esals.configure(state="disabled")
+
+    def _build_tab_calc_thickness(self):
+        body = ttk.Frame(self.tab_calc_thickness)
+        body.pack(fill="both", expand=True)
+        self.txt_calc_thickness = tk.Text(body, height=30, wrap="word")
+        sc = ttk.Scrollbar(body, orient="vertical", command=self.txt_calc_thickness.yview)
+        self.txt_calc_thickness.configure(yscrollcommand=sc.set)
+        self.txt_calc_thickness.pack(side="left", fill="both", expand=True)
+        sc.pack(side="right", fill="y")
+        self.txt_calc_thickness.configure(state="disabled")
+
     def _build_tab_results(self):
-        top = ttk.LabelFrame(self.tab_results, text="W18 acumulado", padding=8)
+        top = ttk.LabelFrame(self.tab_results, text="Resultado final de espesores", padding=8)
         top.pack(fill="x", pady=(0,8))
         self.v_w18_big = tk.StringVar(value="0")
         ttk.Label(top, textvariable=self.v_w18_big, foreground="#0b5394", font=("Segoe UI", 24, "bold")).pack(anchor="center")
@@ -265,17 +288,6 @@ class App:
         self.txt.pack(side="left", fill="both", expand=True)
         sc.pack(side="right", fill="y")
         self.txt.configure(state="disabled")
-
-    def _build_tab_calculos(self):
-        body = ttk.Frame(self.tab_calculos)
-        body.pack(fill="both", expand=True)
-        self.txt_calc = tk.Text(body, height=30, wrap="word")
-        sc = ttk.Scrollbar(body, orient="vertical", command=self.txt_calc.yview)
-        self.txt_calc.configure(yscrollcommand=sc.set)
-        self.txt_calc.pack(side="left", fill="both", expand=True)
-        sc.pack(side="right", fill="y")
-        self.txt_calc.configure(state="disabled")
-
 
     def _build_tab_costs(self):
         frm = ttk.LabelFrame(self.tab_costs, text="Parámetros de costo por m³", padding=12)
@@ -330,7 +342,7 @@ class App:
         for idx, row in enumerate(t.get("truck_classes", [])):
             if idx < len(self.class_rows):
                 en, n, s_v, c_v, e = self.class_rows[idx]
-                en.set(bool(row.get("enabled", True))); n.set(str(row.get("name", ""))); s_v.set(str(row.get("share_pct", ""))); c_v.set(str(row.get("count", ""))); e.set(str(row.get("ealf", "")))
+                en.set(bool(row.get("enabled", True))); n.set(str(row.get("name", ""))); s_v.set(str(row.get("share_pct", ""))); c_v.set(str(row.get("count", ""))); e.set(f"{float(row.get('ealf',0.0)):.4f}")
         self.v_rel.set(str(a["reliability_pct"])); self.v_so.set(str(a["so"])); self.v_pi.set(str(a["pi"])); self.v_pt.set(str(a["pt"])); self.v_mr.set(str(a["mr_mpa"]))
         self.v_a1.set(str(l["a1"])); self.v_a2.set(str(l["a2"])); self.v_a3.set(str(l["a3"])); self.v_m2.set(str(l["m2"])); self.v_m3.set(str(l["m3"])); self.v_sn1.set(str(l["sn1_target"])); self.v_sn2.set(str(l["sn2_target"])); self.v_sn3.set(str(l["sn3_target"]))
         c = self.data["prelim_costs"]
@@ -547,7 +559,8 @@ class App:
         self.data = self.default_data()
         self._load_to_form()
         self._write_text(self.txt, "Proyecto reiniciado.\n")
-        self._write_text(self.txt_calc, "")
+        self._write_text(self.txt_calc_esals, "")
+        self._write_text(self.txt_calc_thickness, "")
 
     def on_open(self):
         path = filedialog.askopenfilename(title="Abrir proyecto", filetypes=[("Proyecto JSON", "*.json")])
@@ -588,17 +601,24 @@ class App:
 
     def _format_esal_breakdown(self, esal_detail: dict) -> str:
         lines = []
-        lines.append("DESGLOSE ESAL POR TIPO\n")
-        lines.append("Tipo            ADT_i        EALF        ESAL_i\n")
-        lines.append("-"*54 + "\n")
-        for r in esal_detail.get("rows", []):
-            lines.append(f"{r['name']:<12}{r['ADT_i']:>10.2f}{r['ealf']:>12.3f}{r['ESAL_i']:>20.2f}\n")
-        lines.append("\n")
-        lines.append(f"Factor B: {esal_detail.get('B',0):.6f}\n")
+        lines.append("DESGLOSE COMPLETO DE CÁLCULO ESAL\n\n")
+        lines.append("1) Parámetros globales\n")
+        lines.append(f"- Factor B: {esal_detail.get('B', 0):.6f}\n")
+        lines.append(f"- ΣESAL: {esal_detail.get('sum_esal', 0):,.4f}\n")
+        lines.append(f"- W18: {esal_detail.get('W18', 0):,.4f}\n")
         if esal_detail.get("mode") == "share_pct":
-            lines.append(f"Suma participación: {esal_detail.get('total_share_pct',0):.2f}%\n")
-        lines.append(f"ΣESAL: {esal_detail.get('sum_esal',0):,.2f}\n")
-        lines.append(f"W18: {esal_detail.get('W18',0):,.2f}\n")
+            lines.append(f"- Suma participación: {esal_detail.get('total_share_pct', 0):.4f}%\n")
+        lines.append("\n2) Cálculo por tipo\n")
+        lines.append("Tipo            ADT_i          EALF            ESAL_i\n")
+        lines.append("-" * 62 + "\n")
+        for r in esal_detail.get("rows", []):
+            lines.append(f"{r['name']:<12}{r['ADT_i']:>12.4f}{r['ealf']:>14.4f}{r['ESAL_i']:>24.4f}\n")
+        lines.append("\n3) Fórmulas usadas\n")
+        lines.append("- ADT_i (modo %): TPDA * (%Participación_i/100).\n")
+        lines.append("- ADT_i (modo tránsito): Tránsito_i capturado.\n")
+        lines.append("- ESAL_i = ADT_i * EALF_i * 365 * B.\n")
+        lines.append("- ΣESAL = suma de ESAL_i.\n")
+        lines.append("- W18 = ΣESAL * DD * DL.\n")
         return "".join(lines)
 
     def on_calculate_esals(self):
@@ -609,9 +629,9 @@ class App:
             self.data["results"]["ESAL_detail"] = esal_detail
             self.v_w18_traffic.set(f"{w18:,.0f}")
             self.v_w18_big.set(f"{w18:,.0f}")
-            self._write_text(self.txt_calc, self._format_esal_breakdown(esal_detail))
+            self._write_text(self.txt_calc_esals, self._format_esal_breakdown(esal_detail))
             self.v_esal_warn.set("⚠ Solo se han calculado ESALs. Ejecuta 'Calcular' para actualizar espesores.")
-            self.nb.select(self.tab_traffic)
+            self.nb.select(self.tab_calc_esals)
             messagebox.showwarning("ESALs", "Solo se calculó tránsito/ESALs. Ejecuta 'Calcular' para actualizar espesores y costos.")
         except Exception as e:
             messagebox.showerror("ESALs", f"No se pudo calcular ESALs:\n{e}")
@@ -671,36 +691,19 @@ class App:
             self.v_esal_warn.set("")
 
             out = []
-            out.append("RESULTADOS AASHTO 1993\n\n")
-            out.append("Metodología ESAL usada:\n")
-            out.append("- r = crecimiento(%) / 100 y B = ((1+r)^n - 1) / r.\n")
-            if t.get("class_input_mode") == "count":
-                out.append("- ADT_i = Tránsito_i capturado (veh/día).\n")
-            else:
-                out.append("- ADT_i = TPDA * (%Participación_i/100).\n")
-            out.append("- ESAL_i = ADT_i * EALF_i * 365 * B.\n")
-            out.append("- W18 = ΣESAL_i * DD * DL.\n\n")
+            out.append("RESULTADOS SIMPLIFICADOS DE ESPESORES\n\n")
             out.append(f"W18 acumulado: {w18:,.0f}\n")
-            out.append(f"Factor B: {esal_detail['B']:.6f} | ΣESAL: {esal_detail['sum_esal']:,.2f}\n\n")
-            out.append(f"SN3 objetivo (usuario): {fnum(sn3_target,3)}\n")
-            out.append(f"SN3 estimado por AASHTO (referencia): {fnum(sn3_aashto,3)}\n")
-            out.append(f"SN1 objetivo: {fnum(l['sn1_target'],3)} | SN2 objetivo: {fnum(l['sn2_target'],3)}\n\n")
-            out.append("1) Espesores calculados (SIN mínimos)\n\n")
-            out.append(f"- D1: {fnum(calc['D1_in'],2)} in | {fnum(calc['D1_cm'],2)} cm\n")
-            out.append(f"- D2: {fnum(calc['D2_in'],2)} in | {fnum(calc['D2_cm'],2)} cm\n")
-            out.append(f"- D3: {fnum(calc['D3_in'],2)} in | {fnum(calc['D3_cm'],2)} cm\n")
-            out.append(f"SN corregidos sumados: {fnum(calc['SN_sum'],3)}\n\n")
-            out.append("\n2) Espesores ajustados con mínimos sugeridos\n\n")
-            out.append(f"Rango tabla: {mins['minimum_table']['range_label']}\n")
+            out.append(f"SN3 objetivo (usuario): {fnum(sn3_target,3)} | SN3 AASHTO ref.: {fnum(sn3_aashto,3)}\n\n")
+            out.append("Espesores finales con mínimos sugeridos:\n")
             out.append(f"- D1: {fnum(mins['D1_in'],2)} in | {fnum(mins['D1_cm'],2)} cm\n")
             out.append(f"- D2: {fnum(mins['D2_in'],2)} in | {fnum(mins['D2_cm'],2)} cm\n")
             out.append(f"- D3: {fnum(mins['D3_in'],2)} in | {fnum(mins['D3_cm'],2)} cm\n")
-            out.append(f"SN corregidos sumados: {fnum(mins['SN_sum'],3)}\n")
-            out.append("Observación: En ajuste con mínimos se toman SIEMPRE D1 y D2 de la tabla/configuración de Opciones.\n")
+            out.append(f"SN total corregido: {fnum(mins['SN_sum'],3)}\n")
+            out.append(f"Rango de mínimos aplicado: {mins['minimum_table']['range_label']}\n")
 
-            calc_txt = self._build_calculos_text(calc, mins, l, sn3_target) + "\n\n" + self._format_esal_breakdown(esal_detail)
             self._write_text(self.txt, "".join(out))
-            self._write_text(self.txt_calc, calc_txt)
+            self._write_text(self.txt_calc_esals, self._format_esal_breakdown(esal_detail))
+            self._write_text(self.txt_calc_thickness, self._build_calculos_text(calc, mins, l, sn3_target))
             self._draw_sections(calc, mins)
             self._write_text(self.txt_cost, self._build_costs_text(costs))
             self.nb.select(self.tab_results)
