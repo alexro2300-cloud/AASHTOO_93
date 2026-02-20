@@ -1,3 +1,16 @@
+import math
+
+
+
+DEFAULT_MINIMUMS_TABLE_IN = {
+    "lt_50000": {"label": "< 50,000", "D1_min_in": 1.0, "D2_min_in": 4.0},
+    "50k_150k": {"label": "50,001 - 150,000", "D1_min_in": 2.0, "D2_min_in": 4.0},
+    "150k_500k": {"label": "150,001 - 500,000", "D1_min_in": 2.5, "D2_min_in": 4.0},
+    "500k_2m": {"label": "500,001 - 2,000,000", "D1_min_in": 3.0, "D2_min_in": 6.0},
+    "2m_7m": {"label": "2,000,001 - 7,000,000", "D1_min_in": 3.5, "D2_min_in": 6.0},
+    "gt_7m": {"label": "> 7,000,000", "D1_min_in": 4.0, "D2_min_in": 6.0},
+}
+
 def _cm_to_in(cm: float) -> float:
     return cm / 2.54
 
@@ -7,57 +20,130 @@ def _in_to_cm(inches: float) -> float:
 
 
 def sn_provided(a1, a2, a3, m2, m3, d1_in, d2_in, d3_in) -> float:
-    return a1*d1_in + a2*m2*d2_in + a3*m3*d3_in
+    return a1 * d1_in + a2 * m2 * d2_in + a3 * m3 * d3_in
 
 
-def recommend_thicknesses(
-    sn_required: float,
-    a1: float, a2: float, a3: float,
-    m2: float, m3: float,
-    step_in: float,
-    d1_fixed_cm: float,
-    d2_min_cm: float, d2_max_cm: float,
-    d3_min_cm: float, d3_max_cm: float
-):
+def round_half_nearest(value_in: float) -> float:
+    return round(value_in * 2.0) / 2.0
+
+
+def round_half_up(value_in: float) -> float:
+    if value_in <= 0:
+        return 0.0
+    return math.ceil(value_in * 2.0 - 1e-12) / 2.0
+
+
+def minimum_thicknesses_by_w18(w18: float, table_in: dict | None = None) -> dict:
+    """Tabla de mínimos en pulgadas configurable por rangos de W18."""
+    table = table_in or DEFAULT_MINIMUMS_TABLE_IN
+    if w18 < 50_000:
+        row = table["lt_50000"]
+    elif w18 <= 150_000:
+        row = table["50k_150k"]
+    elif w18 <= 500_000:
+        row = table["150k_500k"]
+    elif w18 <= 2_000_000:
+        row = table["500k_2m"]
+    elif w18 <= 7_000_000:
+        row = table["2m_7m"]
+    else:
+        row = table["gt_7m"]
+
+    d1_in = float(row["D1_min_in"])
+    d2_in = float(row["D2_min_in"])
+    return {
+        "range_label": row.get("label", "Rango"),
+        "D1_min_in": d1_in,
+        "D2_min_in": d2_in,
+        "D1_min_cm": _in_to_cm(d1_in),
+        "D2_min_cm": _in_to_cm(d2_in),
+    }
+
+def design_thicknesses_sequential(sn1_target, sn2_target, sn3_target, a1, a2, a3, m2, m3):
     """
-    MVP: D1 fijo; busca el menor (D2,D3) en una malla que cumpla SN.
-    Criterio: minimizar (D2 + D3). Paso en pulgadas.
+    Metodología secuencial solicitada por el usuario:
+    1) D1=SN1/a1 (redondeo 0.5 in más cercana)
+    2) D2=(SN2-SN1*)/(a2*m2) (redondeo 0.5 in hacia arriba)
+    3) D3=(SN3-(SN1*+SN2*))/(a3*m3) (redondeo 0.5 in hacia arriba)
     """
-    if sn_required <= 0:
-        raise ValueError("SN requerido debe ser > 0")
-    if step_in <= 0:
-        raise ValueError("step_in debe ser > 0")
+    if a1 <= 0 or a2 <= 0 or a3 <= 0 or m2 <= 0 or m3 <= 0:
+        raise ValueError("a1, a2, a3, m2 y m3 deben ser > 0")
+    if sn1_target <= 0 or sn2_target <= 0 or sn3_target <= 0:
+        raise ValueError("SN1, SN2 y SN3 deben ser > 0")
+    if not (sn1_target <= sn2_target <= sn3_target):
+        raise ValueError("Debe cumplirse SN1 <= SN2 <= SN3")
 
-    d1_in = _cm_to_in(d1_fixed_cm)
+    d1_raw = sn1_target / a1
+    d1_round = round_half_nearest(d1_raw)
+    sn1_star = d1_round * a1
 
-    d2_min_in = _cm_to_in(d2_min_cm); d2_max_in = _cm_to_in(d2_max_cm)
-    d3_min_in = _cm_to_in(d3_min_cm); d3_max_in = _cm_to_in(d3_max_cm)
+    d2_raw = (sn2_target - sn1_star) / (a2 * m2)
+    d2_round = round_half_up(d2_raw)
+    sn2_star = d2_round * a2 * m2
 
-    best = None
-    best_sn = -1e9
+    d3_raw = (sn3_target - (sn1_star + sn2_star)) / (a3 * m3)
+    d3_round = round_half_up(d3_raw)
+    sn3_star = d3_round * a3 * m3
 
-    # Itera D2 y D3 en malla
-    d2 = d2_min_in
-    while d2 <= d2_max_in + 1e-9:
-        d3 = d3_min_in
-        while d3 <= d3_max_in + 1e-9:
-            sn = sn_provided(a1, a2, a3, m2, m3, d1_in, d2, d3)
-            if sn > best_sn:
-                best_sn = sn
-            if sn >= sn_required:
-                obj = d2 + d3
-                if (best is None) or (obj < best["obj"] - 1e-9):
-                    best = {"d2": d2, "d3": d3, "sn": sn, "obj": obj}
-            d3 += step_in
-        d2 += step_in
+    sn_sum = sn1_star + sn2_star + sn3_star
+    return {
+        "SN1_target": sn1_target,
+        "SN2_target": sn2_target,
+        "SN3_target": sn3_target,
+        "D1_raw_in": d1_raw,
+        "D2_raw_in": d2_raw,
+        "D3_raw_in": d3_raw,
+        "D1_in": d1_round,
+        "D2_in": d2_round,
+        "D3_in": d3_round,
+        "D1_cm": _in_to_cm(d1_round),
+        "D2_cm": _in_to_cm(d2_round),
+        "D3_cm": _in_to_cm(d3_round),
+        "SN1_star": sn1_star,
+        "SN2_star": sn2_star,
+        "SN3_star": sn3_star,
+        "SN_sum": sn_sum,
+        "criterion_user_lt_sn3": sn_sum < sn3_target,
+        "criterion_meets_or_exceeds": sn_sum >= sn3_target,
+    }
 
-    if best is None:
-        return {"status": "NO_SOLUTION", "SN_best": best_sn}
+
+def apply_minimums_sequential(calc_result: dict, w18: float, a1, a2, a3, m2, m3, sn3_target: float, minimums_table_in: dict | None = None):
+    """
+    Ajusta carpeta/base por mínimos Tabla 7-2 y recalcula subbase.
+    """
+    mins = minimum_thicknesses_by_w18(w18, table_in=minimums_table_in)
+
+    d1_min_round = round_half_up(mins["D1_min_in"])
+    d2_min_round = round_half_up(mins["D2_min_in"])
+
+    # Regla solicitada: en ajuste con mínimos SIEMPRE usar los mínimos configurados en Opciones
+    d1_adj = d1_min_round
+    d2_adj = d2_min_round
+
+    sn1_star = d1_adj * a1
+    sn2_star = d2_adj * a2 * m2
+
+    d3_raw = (sn3_target - (sn1_star + sn2_star)) / (a3 * m3)
+    d3_adj = round_half_up(d3_raw)
+    sn3_star = d3_adj * a3 * m3
+
+    sn_sum = sn1_star + sn2_star + sn3_star
 
     return {
-        "status": "OK",
-        "D1_cm": d1_fixed_cm,
-        "D2_cm": _in_to_cm(best["d2"]),
-        "D3_cm": _in_to_cm(best["d3"]),
-        "SN_provided": best["sn"]
+        "minimum_table": mins,
+        "D1_in": d1_adj,
+        "D2_in": d2_adj,
+        "D3_in": d3_adj,
+        "D1_cm": _in_to_cm(d1_adj),
+        "D2_cm": _in_to_cm(d2_adj),
+        "D3_cm": _in_to_cm(d3_adj),
+        "D3_raw_in": d3_raw,
+        "SN1_star": sn1_star,
+        "SN2_star": sn2_star,
+        "SN3_star": sn3_star,
+        "SN_sum": sn_sum,
+        "minimums_govern": True,
+        "criterion_user_lt_sn3": sn_sum < sn3_target,
+        "criterion_meets_or_exceeds": sn_sum >= sn3_target,
     }
