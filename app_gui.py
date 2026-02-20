@@ -247,7 +247,8 @@ class App:
         tab_scroll = ttk.Scrollbar(holder, orient="vertical", command=tab_canvas.yview)
         content = ttk.Frame(tab_canvas)
         content.bind("<Configure>", lambda e: tab_canvas.configure(scrollregion=tab_canvas.bbox("all")))
-        tab_canvas.create_window((0, 0), window=content, anchor="nw")
+        content_window = tab_canvas.create_window((0, 0), window=content, anchor="nw")
+        tab_canvas.bind("<Configure>", lambda e: tab_canvas.itemconfigure(content_window, width=e.width))
         tab_canvas.configure(yscrollcommand=tab_scroll.set)
         tab_canvas.pack(side="left", fill="both", expand=True)
         tab_scroll.pack(side="right", fill="y")
@@ -283,7 +284,8 @@ class App:
         sc = ttk.Scrollbar(grid_holder, orient="vertical", command=self.traffic_table_canvas.yview)
         table = ttk.Frame(self.traffic_table_canvas)
         table.bind("<Configure>", lambda e: self.traffic_table_canvas.configure(scrollregion=self.traffic_table_canvas.bbox("all")))
-        self.traffic_table_canvas.create_window((0, 0), window=table, anchor="nw")
+        table_window = self.traffic_table_canvas.create_window((0, 0), window=table, anchor="nw")
+        self.traffic_table_canvas.bind("<Configure>", lambda e: self.traffic_table_canvas.itemconfigure(table_window, width=e.width))
         self.traffic_table_canvas.configure(yscrollcommand=sc.set)
         self.traffic_table_canvas.pack(side="left", fill="both", expand=True)
         sc.pack(side="right", fill="y")
@@ -296,6 +298,8 @@ class App:
             ttk.Label(content, text="[Imagen tipos de vehículos: sources/images/traffic_types.png]", foreground="#666").pack(anchor="e", pady=(6, 0))
 
         headers = ["Usar", "Nomenclatura", "Participación %", "Tránsito (veh/día)", "EALF"]
+        for c in range(5):
+            table.columnconfigure(c, weight=1)
         for i, h in enumerate(headers):
             ttk.Label(table, text=h).grid(row=0, column=i, sticky="w")
 
