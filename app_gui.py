@@ -225,6 +225,7 @@ class App:
         self.tab_calc_thickness = ttk.Frame(self.nb, padding=12)
         self.tab_costs = ttk.Frame(self.nb, padding=12)
         self.tab_section = ttk.Frame(self.nb, padding=12)
+        self.tab_damage_factor = ttk.Frame(self.nb, padding=12)
         self.tab_legal = ttk.Frame(self.nb, padding=12)
 
         self.nb.add(self.tab_traffic, text="Tránsito / ESALs")
@@ -235,6 +236,7 @@ class App:
         self.nb.add(self.tab_results, text="Resultados")
         self.nb.add(self.tab_costs, text="Costos preliminares")
         self.nb.add(self.tab_section, text="Sección de Pavimento")
+        self.nb.add(self.tab_damage_factor, text="Factor de daño")
         self.nb.add(self.tab_legal, text="Legal")
 
         self._build_tab_traffic()
@@ -245,6 +247,7 @@ class App:
         self._build_tab_results()
         self._build_tab_costs()
         self._build_tab_section()
+        self._build_tab_damage_factor()
         self._build_tab_legal()
         self._load_to_form()
 
@@ -510,6 +513,13 @@ class App:
         self.canvas_min = tk.Canvas(holder, width=500, height=520, bg="white")
         self.canvas_calc.grid(row=1, column=0, sticky="nsew", padx=6, pady=6)
         self.canvas_min.grid(row=1, column=1, sticky="nsew", padx=6, pady=6)
+
+    def _build_tab_damage_factor(self):
+        holder = ttk.Frame(self.tab_damage_factor)
+        holder.pack(fill="both", expand=True)
+        ttk.Label(holder, text="Cálculo del factor de daño por vehículo", font=("Segoe UI", 12, "bold")).pack(pady=(20, 8))
+        ttk.Label(holder, text="Próximamente", foreground="#666").pack(pady=(0, 12))
+        ttk.Label(holder, text="😊", font=("Segoe UI Emoji", 72)).pack(pady=10)
 
     def _build_tab_legal(self):
         body = ttk.Frame(self.tab_legal)
